@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spaceships</title>
+<style>
+/* ------------------------------------------------------------------ tokens
+   A table in a room, seen from above. Card stock and table top are both pale,
+   the way they are in life, so cards separate by shadow rather than by colour.
+   One committed visual world, so every colour is painted explicitly. */
+:root{
+  --room:      #17150F;      /* the room around the table */
+  --room-2:    #221F16;
+  --felt:      #E7E3D7;      /* the table top */
+  --felt-2:    #DAD5C6;
+  --felt-line: #CFC9B7;      /* the seam across it */
+
+  --stock:     #F7F4EC;      /* card stock */
+  --gold:      #A08E52;      /* the printed gold */
+  --gold-lit:  #C3AF6F;
+  --gold-deep: #79693A;
+
+  --ink:       #2B2620;
+  --ink-soft:  #6A6357;
+  --ink-faint: #928B7C;
+
+  --pen:       #24356B;      /* biro on the score sheet */
+  --pen-soft:  #4A5A8C;
+  --paper:     #FBFAF6;
+  --paper-2:   #EFEDE4;
+  --print:     #B9B5AA;
+
+  --danger:    #A8402A;
+
+  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Times New Roman", serif;
+
+  --cw: 48px;                /* card width; height is 1.4x */
+}
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+
+body{
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--room-2) 0%, rgba(23,21,15,0) 60%),
+    var(--room);
+  color:#E7E2D4;
+  font-family: var(--serif);
+  font-size:16px;
+  line-height:1.5;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+.sprite{ position:absolute; width:0; height:0; overflow:hidden; }
+
+.label{
+  font-size:.57rem; text-transform:uppercase; letter-spacing:.18em;
+  color: var(--ink-faint); font-weight:400;
+}
+.num{ font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ shell */
+.room{
+  max-width:1240px; margin:0 auto; padding:18px 18px 32px;
+  display:flex; flex-direction:column; gap:14px;
+}
+.topbar{ display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.topbar h1{
+  margin:0; font-size:1.2rem; font-weight:400;
+  letter-spacing:.3em; text-transform:uppercase; color:#EFEADB;
+}
+.topbar .set{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.topbar .label{ color:#8C846E; }
+
+button, select{
+  font-family: var(--serif); font-size:.68rem;
+  text-transform:uppercase; letter-spacing:.14em;
+  color:#EFEADB; background:#241F14;
+  border:1px solid #3D3624; border-radius:2px;
+  padding:8px 13px; cursor:pointer;
+  transition:border-color .15s, color .15s;
+}
+button:hover:not(:disabled), select:hover{ border-color:var(--gold); color:var(--gold-lit); }
+button:focus-visible, select:focus-visible{ outline:2px solid var(--gold-lit); outline-offset:2px; }
+button:disabled{ opacity:.45; cursor:not-allowed; }
+button.commit{ border-color:#8C3A24; color:#F0C6B6; background:#2C160E; }
+button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
+
+/* --------------------------------------------------------------- the table */
+.felt-wrap{ display:grid; grid-template-columns:1fr auto; gap:16px; align-items:start; }
+
+.felt{
+  position:relative;
+  background:linear-gradient(158deg, var(--felt) 0%, var(--felt-2) 100%);
+  border-radius:6px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.55) inset,
+    0 18px 44px rgba(0,0,0,.55),
+    0 2px 6px rgba(0,0,0,.4);
+  padding:16px 14px;
+  min-height:400px;
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  grid-template-rows:auto auto auto;
+  align-content:space-between;
+  justify-items:center;      /* players sit at the table, not across it */
+  gap:8px;
+  color:var(--ink);
+  overflow:hidden;
+}
+/* the seam across the table top, as in the room this was drawn from */
+.felt::after{
+  content:""; position:absolute; top:0; bottom:0; left:50%;
+  width:1px; background:var(--felt-line); pointer-events:none;
+}
+
+.seat{
+  position:relative; z-index:1;
+  border:1px solid transparent; border-radius:4px;
+  padding:7px 9px;
+  display:flex; flex-direction:column; gap:6px;
+  transition:border-color .15s, background .15s;
+  min-width:0;
+}
+.seat.turn{ border-color:var(--gold); background:rgba(160,142,82,.12); }
+.seat.targeted{ border-color:var(--danger); background:rgba(168,64,42,.08); }
+.seat.pickable{ cursor:pointer; }
+.seat.pickable:hover{ border-color:var(--danger); }
+.seat.pickable:focus-visible{ outline:2px solid var(--danger); outline-offset:2px; }
+.seat.out{ opacity:.4; }
+
+.nameline{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.nameline .nm{ font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--ink); }
+.nameline .hp{ font-size:1.45rem; line-height:1; color:var(--ink); }
+.nameline .hp.hurt{ color:var(--danger); }
+.tag{
+  font-size:.54rem; letter-spacing:.15em; text-transform:uppercase;
+  border:1px solid currentColor; border-radius:2px; padding:1px 6px;
+}
+.tag.go{ color:var(--gold-deep); }
+.tag.aim, .tag.gone{ color:var(--danger); }
+
+.rows{ display:flex; gap:13px; align-items:flex-end; flex-wrap:wrap; }
+.grp{ display:flex; flex-direction:column; gap:3px; }
+.grp .cards{ display:flex; align-items:flex-end; }
+.grp .cards .card + .card{ margin-left:-9px; }
+
+/* seat placement, by table size */
+.felt[data-seats="2"] .s0{ grid-area:1 / 2; }
+.felt[data-seats="2"] .s1{ grid-area:3 / 2; }
+.felt[data-seats="3"] .s0{ grid-area:1 / 1; }
+.felt[data-seats="3"] .s1{ grid-area:1 / 3; }
+.felt[data-seats="3"] .s2{ grid-area:3 / 2; }
+.felt[data-seats="4"] .s0{ grid-area:1 / 2; }
+.felt[data-seats="4"] .s1{ grid-area:2 / 1; align-self:center; }
+.felt[data-seats="4"] .s2{ grid-area:2 / 3; align-self:center; }
+.felt[data-seats="4"] .s3{ grid-area:3 / 2; }
+
+.middle{
+  grid-area:2 / 2; position:relative; z-index:1;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:9px; min-height:0;
+}
+.piles{ display:flex; gap:20px; align-items:flex-start; }
+.pile{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+.stack{ position:relative; width:var(--cw); height:calc(var(--cw)*1.4); }
+.stack .card{ position:absolute; inset:0; }
+.slot-empty{ width:var(--cw); height:calc(var(--cw)*1.4); border:1px dashed #C0BAA8; border-radius:4px; }
+.played{ display:flex; gap:3px; align-items:flex-end; min-height:calc(var(--cw)*1.4); flex-wrap:wrap; justify-content:center; }
+.said{ margin:0; font-size:.88rem; color:var(--ink); text-align:center; max-width:36ch; }
+.said .hit{ color:var(--danger); }
+.said .no{ color:var(--ink-soft); }
+.said em{ color:var(--gold-deep); font-style:normal; }
+.said .idle{ color:var(--ink-faint); font-style:italic; }
+
+/* ------------------------------------------------------------------ cards */
+.card{
+  width:var(--cw); height:calc(var(--cw)*1.4);
+  border-radius:3px; background:var(--stock);
+  box-shadow:0 1px 2px rgba(0,0,0,.3), 0 5px 12px rgba(0,0,0,.22);
+  flex:0 0 auto; position:relative; overflow:hidden;
+}
+.card svg{ display:block; width:100%; height:100%; }
+.card.dealt{ animation:drop .22s ease-out both; }
+@keyframes drop{ from{ opacity:0; } to{ opacity:1; } }
+
+/* a shield lies on its side; a rotated card keeps its portrait layout box,
+   so the wrapper carries the landscape footprint explicitly */
+.land{ position:relative; width:calc(var(--cw)*1.4); height:var(--cw); flex:0 0 auto; }
+.land .card{ position:absolute; top:50%; left:50%; }
+
+.face{
+  position:absolute; inset:0;
+  display:grid; grid-template-rows:auto 1fr auto;
+  padding:4px 4px 3px; color:var(--gold-deep);
+}
+.face::before{
+  content:""; position:absolute; inset:2.5px;
+  border:1px solid var(--gold); border-radius:2px; opacity:.5;
+}
+.face .pip{ font-size:calc(var(--cw)*.26); line-height:1; position:relative; }
+.face .pip.bot{ transform:rotate(180deg); }
+.face .mid{ display:grid; place-items:center; position:relative; }
+.face .mid svg{ width:calc(var(--cw)*.36); height:calc(var(--cw)*.36); opacity:.7; }
+
+/* --------------------------------------------------------- the score sheet */
+.sheet{
+  position:relative; width:236px;
+  background:linear-gradient(172deg, var(--paper), var(--paper-2));
+  border-radius:2px;
+  box-shadow:0 14px 34px rgba(0,0,0,.5), 0 2px 5px rgba(0,0,0,.35);
+  padding:15px 14px 13px;
+  transform:rotate(-1.2deg);
+  color:var(--pen);
+}
+.sheet .printed{ display:flex; flex-direction:column; gap:6px; margin-bottom:13px; opacity:.5; }
+.sheet .printed i{
+  display:block; height:20px; border-radius:1px;
+  background:repeating-linear-gradient(var(--print) 0 1.5px, transparent 1.5px 5.5px);
+}
+.sheet .printed i:nth-child(2){ width:88%; }
+.sheet .printed i:nth-child(3){ width:70%; }
+.sheet h2{
+  margin:0 0 6px; font-size:.58rem; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--pen-soft); font-weight:400;
+}
+.col{ display:flex; flex-direction:column; gap:2px; border-top:1px solid #C9C4B4; padding:6px 2px; }
+.col:last-child{ border-bottom:1px solid #C9C4B4; }
+.who{ display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--pen); }
+.who .live{ font-size:1rem; }
+.who .live.dead{ color:var(--danger); text-decoration:line-through; }
+.runs{ display:flex; flex-wrap:wrap; gap:6px; font-size:.8rem; color:var(--pen-soft); }
+.runs span{ display:inline-block; }
+.runs span.old{ text-decoration:line-through; opacity:.7; }
+
+/* ---------------------------------------------------------------- controls */
+.controls{
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+  border:1px solid #322C1E; background:#1D1A11; padding:12px 14px; border-radius:3px;
+}
+.controls .hint{ font-size:.75rem; color:#A79E82; font-style:italic; margin-left:auto; text-align:right; }
+.journal{
+  border:1px solid #322C1E; background:#1D1A11; border-radius:3px;
+  padding:10px 14px; max-height:126px; overflow-y:auto;
+  display:flex; flex-direction:column-reverse; gap:4px; font-size:.81rem;
+}
+.journal p{ margin:0; color:#A79E82; }
+.journal p strong{ color:#EFEADB; font-weight:400; }
+.journal p.dmg strong{ color:#D9714F; }
+.journal p.sys{ color:#7B735C; font-style:italic; }
+
+.over{
+  border:1px solid var(--gold-deep); background:#241F12; border-radius:3px;
+  padding:14px 16px; display:flex; align-items:center; gap:16px;
+  justify-content:space-between; flex-wrap:wrap;
+}
+.over[hidden], .howto[hidden]{ display:none; }
+.over .msg{ font-size:1.05rem; color:#EFEADB; letter-spacing:.05em; }
+.over .msg.lost{ color:#D9714F; }
+
+.howto{ border:1px solid #322C1E; background:#1D1A11; border-radius:3px; padding:14px 16px; }
+.howto ul{ margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:6px; }
+.howto li{ font-size:.85rem; color:#A79E82; }
+.howto li b{ color:#EFEADB; font-weight:400; }
+
+@media (max-width: 920px){
+  .felt-wrap{ grid-template-columns:1fr; }
+  .sheet{ width:auto; transform:none; }
+}
+@media (max-width: 620px){
+  :root{ --cw:38px; }
+  .felt{ padding:9px; min-height:0; }
+  .controls .hint{ margin-left:0; text-align:left; flex-basis:100%; }
+}
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+
+/* ----------------------------------------------------- card back internals */
+.cb-stock{ fill: var(--stock); }
+.cb-gold{ fill: var(--gold); }
+.cb-hair{ fill:none; stroke: var(--stock); stroke-width:1; opacity:.85; }
+.cb-panel{ fill:none; stroke: var(--stock); stroke-width:1.4; }
+.cb-orn{ fill:none; stroke: var(--stock); stroke-width:1.15; stroke-linecap:round; }
+.cb-orn-fill{ fill: var(--stock); stroke:none; }
+.cb-dot{ fill: var(--stock); opacity:.6; }
+.rose-star{ fill: var(--stock); }
+.rose-shade{ fill: var(--gold-deep); opacity:.85; }
+.rose-ring{ fill:none; stroke: var(--stock); stroke-width:1.1; }
+.rose-teeth{ fill:none; stroke: var(--stock); stroke-width:4.6; stroke-dasharray:2.2 3.6; }
+.rose-hub{ fill: var(--gold-deep); stroke: var(--stock); stroke-width:1; }
+</style>
+</head>
+<body>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="stipple" width="7" height="7" patternUnits="userSpaceOnUse">
+      <circle class="cb-dot" cx="1.75" cy="1.75" r="1.05"/>
+      <circle class="cb-dot" cx="5.25" cy="5.25" r="1.05"/>
+    </pattern>
+
+    <g id="orn-corner">
+      <circle class="cb-orn" r="9.5"/>
+      <circle class="cb-orn-fill" r="2.4"/>
+      <g id="orn-petal-set">
+        <path class="cb-orn-fill" d="M0,-9 C2.4,-7.2 3.4,-5.4 3.4,-3.6 C3.4,-1.8 1.8,-0.9 0,-0.9 C-1.8,-0.9 -3.4,-1.8 -3.4,-3.6 C-3.4,-5.4 -2.4,-7.2 0,-9 Z"/>
+      </g>
+      <use href="#orn-petal-set" transform="rotate(90)"/>
+      <use href="#orn-petal-set" transform="rotate(180)"/>
+      <use href="#orn-petal-set" transform="rotate(270)"/>
+      <path class="cb-orn" d="M-6.7,-6.7 L-9.9,-9.9 M6.7,-6.7 L9.9,-9.9 M-6.7,6.7 L-9.9,9.9 M6.7,6.7 L9.9,9.9"/>
+    </g>
+
+    <g id="orn-unit">
+      <path class="cb-orn-fill" d="M0,2 C2.2,5.4 3.2,8.6 3.2,11.6 C3.2,14.6 2,17.6 0,21 C-2,17.6 -3.2,14.6 -3.2,11.6 C-3.2,8.6 -2.2,5.4 0,2 Z"/>
+      <path class="cb-orn" d="M0,21 L0,26.5"/>
+      <path class="cb-orn-fill" d="M0,24 C1.5,25.4 2.2,26.8 2.2,28.4 C2.2,29.4 1.2,30 0,30 C-1.2,30 -2.2,29.4 -2.2,28.4 C-2.2,26.8 -1.5,25.4 0,24 Z"/>
+      <path class="cb-orn" d="M-2.6,9 C-7,7.4 -11,7.8 -14.6,10.4 C-17.6,12.6 -19.4,15.8 -20,20"/>
+      <path class="cb-orn" d="M2.6,9 C7,7.4 11,7.8 14.6,10.4 C17.6,12.6 19.4,15.8 20,20"/>
+      <path class="cb-orn-fill" d="M-4,15.4 C-7.6,12.6 -11.6,11.6 -16,12.4 C-12.8,14.4 -10.6,17.4 -9.6,21.4 C-7.4,18.6 -5.6,16.6 -4,15.4 Z"/>
+      <path class="cb-orn-fill" d="M4,15.4 C7.6,12.6 11.6,11.6 16,12.4 C12.8,14.4 10.6,17.4 9.6,21.4 C7.4,18.6 5.6,16.6 4,15.4 Z"/>
+      <path class="cb-orn" d="M-20,20 C-19.4,23.2 -17.4,25 -14.6,25 C-12.6,25 -11.2,23.6 -11.2,21.8"/>
+      <path class="cb-orn" d="M20,20 C19.4,23.2 17.4,25 14.6,25 C12.6,25 11.2,23.6 11.2,21.8"/>
+      <circle class="cb-orn-fill" cx="-16.4" cy="5.6" r="1.5"/>
+      <circle class="cb-orn-fill" cx="16.4" cy="5.6" r="1.5"/>
+      <path class="cb-orn" d="M-8.6,4.4 C-10.6,2.6 -13,2 -15.4,3"/>
+      <path class="cb-orn" d="M8.6,4.4 C10.6,2.6 13,2 15.4,3"/>
+    </g>
+
+    <symbol id="rose" viewBox="-32 -32 64 64">
+      <circle class="rose-ring" r="30.5"/>
+      <circle class="rose-teeth" r="27"/>
+      <circle class="rose-ring" r="23"/>
+      <circle class="rose-ring" r="19.5" opacity=".6"/>
+      <path class="rose-star" d="M0,-27 L4.6,-4.6 L27,0 L4.6,4.6 L0,27 L-4.6,4.6 L-27,0 L-4.6,-4.6 Z"/>
+      <path class="rose-shade" d="M0,-27 L4.6,-4.6 L0,0 Z M27,0 L4.6,4.6 L0,0 Z M0,27 L-4.6,4.6 L0,0 Z M-27,0 L-4.6,-4.6 L0,0 Z"/>
+      <path class="rose-star" d="M14,-14 L5.2,-2.6 L2.6,-5.2 Z M14,14 L2.6,5.2 L5.2,2.6 Z M-14,14 L-5.2,2.6 L-2.6,5.2 Z M-14,-14 L-2.6,-5.2 L-5.2,-2.6 Z" opacity=".75"/>
+      <circle class="rose-hub" r="3.1"/>
+    </symbol>
+
+    <symbol id="cardback" viewBox="0 0 240 336">
+      <rect class="cb-stock" width="240" height="336" rx="7"/>
+      <rect class="cb-gold" x="13" y="13" width="214" height="310"/>
+      <rect class="cb-hair" x="19.5" y="19.5" width="201" height="297"/>
+      <use href="#orn-unit" transform="translate(76,20)"/>
+      <use href="#orn-unit" transform="translate(120,20)"/>
+      <use href="#orn-unit" transform="translate(164,20)"/>
+      <use href="#orn-unit" transform="translate(76,316) scale(1,-1)"/>
+      <use href="#orn-unit" transform="translate(120,316) scale(1,-1)"/>
+      <use href="#orn-unit" transform="translate(164,316) scale(1,-1)"/>
+      <use href="#orn-unit" transform="translate(20,78) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(20,123) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(20,168) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(20,213) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(20,258) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(220,78) rotate(90)"/>
+      <use href="#orn-unit" transform="translate(220,123) rotate(90)"/>
+      <use href="#orn-unit" transform="translate(220,168) rotate(90)"/>
+      <use href="#orn-unit" transform="translate(220,213) rotate(90)"/>
+      <use href="#orn-unit" transform="translate(220,258) rotate(90)"/>
+      <use href="#orn-corner" transform="translate(34,34)"/>
+      <use href="#orn-corner" transform="translate(206,34)"/>
+      <use href="#orn-corner" transform="translate(34,302)"/>
+      <use href="#orn-corner" transform="translate(206,302)"/>
+      <rect x="49" y="53" width="142" height="230" fill="url(#stipple)" stroke="none"/>
+      <rect class="cb-panel" x="49" y="53" width="142" height="230"/>
+      <rect class="cb-hair" x="53" y="57" width="134" height="222" opacity=".5"/>
+      <use href="#rose" x="82" y="72" width="76" height="76"/>
+      <use href="#rose" x="82" y="188" width="76" height="76"/>
+      <circle class="cb-orn-fill" cx="57" cy="61" r="1.6"/>
+      <circle class="cb-orn-fill" cx="183" cy="61" r="1.6"/>
+      <circle class="cb-orn-fill" cx="57" cy="275" r="1.6"/>
+      <circle class="cb-orn-fill" cx="183" cy="275" r="1.6"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="room">
+
+  <div class="topbar">
+    <h1>Spaceships</h1>
+    <div class="set">
+      <span class="label" id="seatsLabel">Players</span>
+      <select id="seats" aria-labelledby="seatsLabel">
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+      </select>
+      <button id="howBtn" aria-expanded="false">Rules</button>
+      <button id="newBtn">Deal again</button>
+    </div>
+  </div>
+
+  <section class="howto" id="howto" hidden>
+    <ul>
+      <li><b>Orientation is the notation.</b> Health cards stand upright, the shield lies on its side. Health itself lives on the paper, not the table.</li>
+      <li><b>The shield is permanent.</b> It blocks its own value on every attack, all game. Only a swap ever changes it.</li>
+      <li><b>Charges are blind.</b> Face down from the deck, unseen by the table <em>and</em> by their owner. Everyone knows the count; nobody knows the total.</li>
+      <li><b>Say &ldquo;charge attack&rdquo; before you draw, or not at all.</b> It commits the whole bank &mdash; all or nothing &mdash; and it is binding whether it lands or is blocked. A plain attack is one card and never touches your charges.</li>
+      <li><b>Breaking through disarms.</b> Excess damage comes off health and the defender&rsquo;s entire bank is destroyed. Their shield is untouched. Equal counts as breaking through.</li>
+      <li><b>Click a seat to aim.</b> A plain attack costs you nothing, which makes it the cheap way to wipe somebody else&rsquo;s stockpile.</li>
+    </ul>
+  </section>
+
+  <section class="over" id="over" hidden>
+    <span class="msg" id="overMsg"></span>
+    <button id="overBtn">Deal again</button>
+  </section>
+
+  <div class="felt-wrap">
+    <div class="felt" id="felt" data-seats="3"></div>
+    <aside class="sheet">
+      <div class="printed" aria-hidden="true"><i></i><i></i><i></i></div>
+      <h2>Health</h2>
+      <div id="tally"></div>
+    </aside>
+  </div>
+
+  <section class="controls" id="controls"></section>
+  <section class="journal" id="journal" aria-live="polite" aria-label="Play by play"></section>
+</div>
+
+<script>
+"use strict";
+
+const RANK = {1:"A",11:"J",12:"Q",13:"K"};
+const FULL = {1:"Ace",11:"Jack",12:"Queen",13:"King"};
+const rankName = v => RANK[v] || String(v);
+const rankFull = v => FULL[v] || String(v);
+const rankWord = v => (v === 1 || v === 8 ? "an " : "a ") + rankFull(v);
+
+const NAMES = ["Kino", "Hudson", "Frane"];
+
+function freshDeck(){
+  const d = [];
+  for(let v = 1; v <= 13; v++) for(let s = 0; s < 4; s++) d.push(v);
+  return shuffle(d);
+}
+function shuffle(a){
+  const x = a.slice();
+  for(let i = x.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [x[i], x[j]] = [x[j], x[i]];
+  }
+  return x;
+}
+const tilt = () => Math.random() * 5 - 2.5;   // how a dealt card lands
+
+let S;
+
+function newGame(seats){
+  const n = seats || (S && S.seats) || 3;
+  S = {
+    seats: n, deck: freshDeck(), discard: [], played: [], said: null,
+    busy: false, over: false, armed: false, target: 0, ships: [], lines: []
+  };
+
+  for(let i = 0; i < n; i++){                 // the human takes the near seat
+    const human = i === n - 1;
+    S.ships.push({
+      name: human ? "You" : NAMES[i % NAMES.length],
+      human, hcards: [], hp: 0, hp0: 0, shield: 0, bank: [],
+      hist: [], out: false, rot: { h: [], s: tilt(), b: [] }
+    });
+  }
+  for(const sh of S.ships){
+    sh.hcards = [S.deck.pop(), S.deck.pop(), S.deck.pop()];
+    sh.rot.h = sh.hcards.map(tilt);
+    sh.hp0 = sh.hcards.reduce((a, b) => a + b, 0);
+    sh.hp = sh.hp0;
+    sh.hist = [sh.hp0];
+    sh.shield = S.deck.pop();
+  }
+
+  let first = 0;                              // lowest starting health opens
+  for(let i = 1; i < n; i++){
+    const a = S.ships[i], b = S.ships[first];
+    if(a.hp0 < b.hp0 || (a.hp0 === b.hp0 && a.shield < b.shield)) first = i;
+  }
+  S.turn = first;
+  S.target = nextLiving(first);
+
+  say(`Dealt. ${S.ships.map(s => `${s.name} ${s.hp0}`).join(", ")}.`);
+  say(`${S.ships[first].name} opens &mdash; lowest starting health takes the first turn.`, "sys");
+
+  render();
+  if(!S.ships[S.turn].human) queueAI();
+}
+
+const living = () => S.ships.filter(s => !s.out);
+function nextLiving(from){
+  for(let k = 1; k <= S.seats; k++){
+    const i = (from + k) % S.seats;
+    if(!S.ships[i].out) return i;
+  }
+  return from;
+}
+
+function draw(){
+  if(!S.deck.length){
+    if(!S.discard.length) return null;
+    S.deck = shuffle(S.discard);
+    S.discard = [];
+    say("Deck out. Discards shuffled back.", "sys");
+  }
+  return S.deck.pop();
+}
+
+function hurt(sh, dmg){
+  sh.hp = Math.max(0, sh.hp - dmg);
+  sh.hist.push(sh.hp);
+  if(sh.hp === 0){
+    sh.out = true;
+    if(sh.bank.length) S.discard.push(...sh.bank.splice(0));
+    say(`<strong>${sh.name} is out.</strong>`);
+  }
+}
+
+/* ------------------------------------------------------------- resolution */
+function attack(mi, ti, declared){
+  const me = S.ships[mi], foe = S.ships[ti];
+  const bank = declared ? me.bank.slice() : [];
+  const card = draw();
+  const total = (card || 0) + bank.reduce((a, b) => a + b, 0);
+  const broke = total >= foe.shield;
+  const dmg = broke ? total - foe.shield : 0;
+
+  S.played = [];
+  if(card !== null) S.played.push(card);
+  S.played.push(...bank);
+
+  if(broke){
+    if(foe.bank.length) S.discard.push(...foe.bank.splice(0));
+    if(dmg > 0) hurt(foe, dmg);
+  }
+  if(card !== null) S.discard.push(card);
+  if(declared){ S.discard.push(...bank); me.bank.length = 0; me.rot.b.length = 0; }
+
+  S.said = `<em>${total}</em> into ${foe.name}&rsquo;s ${rankName(foe.shield)} &mdash; ` + (
+    broke && dmg > 0 ? `<span class="hit">through for ${dmg}.</span>`
+    : broke          ? `<span class="hit">dead level. No damage, bank wiped.</span>`
+                     : `<span class="no">blocked.</span>`);
+
+  const how = card === null
+    ? `fires ${bank.length} charge${bank.length > 1 ? "s" : ""} with nothing left to draw`
+    : `draws ${rankWord(card)}${bank.length ? ` and turns over ${bank.length} charge${bank.length > 1 ? "s" : ""}` : ""}`;
+  const lead = declared ? `${me.name} declares <strong>charge attack</strong>, ` : `${me.name} `;
+
+  if(broke && dmg > 0)
+    say(`${lead}${how} for <strong>${total}</strong>. Through ${foe.name}&rsquo;s ${rankFull(foe.shield)} for <strong>${dmg}</strong>.`, "dmg");
+  else if(broke)
+    say(`${lead}${how} for <strong>${total}</strong> &mdash; exactly ${foe.name}&rsquo;s shield. No damage, but their bank is gone.`);
+  else
+    say(`${lead}${how} for <strong>${total}</strong>. ${foe.name}&rsquo;s ${rankFull(foe.shield)} holds.`);
+
+  if(broke && !declared && me.bank.length)
+    say(`${me.name} keeps ${me.bank.length} charge${me.bank.length > 1 ? "s" : ""} &mdash; undeclared charges are never spent.`, "sys");
+
+  next();
+}
+
+function charge(mi){
+  const me = S.ships[mi];
+  const card = draw();
+  if(card === null){ say("Nothing to draw &mdash; you must fire.", "sys"); return; }
+  me.bank.push(card);
+  me.rot.b.push(tilt());
+  S.played = [null];
+  S.said = `<span class="idle">Face down, unseen. ${me.name} holds ${me.bank.length}.</span>`;
+  say(`${me.name} charges. <strong>${me.bank.length}</strong> banked, value unknown to anyone.`);
+  next();
+}
+
+function swap(mi, ti){
+  const me = S.ships[mi], t = S.ships[ti];
+  const card = draw();
+  if(card === null){ say("Nothing to draw &mdash; you must fire.", "sys"); return; }
+  const old = t.shield;
+  t.shield = card;
+  t.rot.s = tilt();
+  S.discard.push(old);
+  S.played = [card];
+  S.said = `${t.name}&rsquo;s shield: <em>${rankName(old)}</em> out, <em>${rankName(card)}</em> in &mdash; ${card > old ? "better" : card < old ? "worse" : "no change"}.`;
+  say(`${me.name} swaps ${mi === ti ? "their own" : `${t.name}&rsquo;s`} shield: ${rankName(old)} out, <strong>${rankName(card)}</strong> in.`);
+  next();
+}
+
+function next(){
+  if(living().length <= 1){ S.over = true; render(); finish(); return; }
+  S.turn = nextLiving(S.turn);
+  S.armed = false;
+  if(S.ships[S.target].out || S.target === S.turn) S.target = nextLiving(S.turn);
+  render();
+  if(!S.ships[S.turn].human) queueAI();
+}
+
+function queueAI(){
+  S.busy = true;
+  render();
+  setTimeout(() => { S.busy = false; if(!S.over) aiTurn(); }, 1500);
+}
+
+function finish(){
+  const last = living()[0];
+  const el = document.getElementById("over");
+  const msg = document.getElementById("overMsg");
+  const won = last && last.human;
+  msg.textContent = won ? "Last ship flying. You win." : `${last ? last.name : "Nobody"} takes it.`;
+  msg.className = "msg" + (won ? "" : " lost");
+  el.hidden = false;
+}
+
+/* -------------------------------------------------------------------- AI */
+function aiTurn(){
+  if(S.over) return;
+  const mi = S.turn, me = S.ships[mi];
+  const foes = S.ships.map((s, i) => ({ s, i })).filter(x => !x.s.out && x.i !== mi);
+  if(!foes.length) return;
+  const n = me.bank.length;
+
+  const kill = foes.find(f => 7 * (n + 1) >= f.s.hp + f.s.shield);
+  const stacked = foes.filter(f => f.s.bank.length >= 2)
+                      .sort((a, b) => b.s.bank.length - a.s.bank.length)[0];
+
+  if(me.shield <= 5) return swap(mi, mi);
+  if(stacked && stacked.s.shield <= 8) return attack(mi, stacked.i, false);
+  if(n >= 3) return attack(mi, softest(foes), true);
+  if(n >= 1 && kill) return attack(mi, kill.i, true);
+  if(!S.deck.length && !S.discard.length) return attack(mi, softest(foes), n > 0);
+  return charge(mi);
+}
+const softest = foes =>
+  foes.slice().sort((a, b) => (a.s.shield - b.s.shield) || (a.s.hp - b.s.hp))[0].i;
+
+/* ---------------------------------------------------------------- render */
+const backHTML = r =>
+  `<div class="card dealt" style="transform:rotate(${r}deg)"><svg viewBox="0 0 240 336" role="img" aria-label="face-down card"><use href="#cardback"/></svg></div>`;
+
+/* `land` turns the card on its side for a shield. The rotation has to go in the
+   same inline transform as the tilt -- a CSS rule would lose to it. */
+const faceHTML = (v, r, land) =>
+  `<div class="card dealt" style="transform:${land
+      ? `translate(-50%,-50%) rotate(${90 + r}deg)`
+      : `rotate(${r}deg)`}"><div class="face" role="img" aria-label="${rankName(v)}">
+     <div class="pip num">${rankName(v)}</div>
+     <div class="mid"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#rose" x="0" y="0" width="64" height="64"/></svg></div>
+     <div class="pip bot num">${rankName(v)}</div>
+   </div></div>`;
+
+function seatHTML(i){
+  const sh = S.ships[i];
+  const isTurn = S.turn === i && !S.over;
+  const targeted = S.target === i && !sh.human && !sh.out && !S.over;
+  const canPick = !sh.human && !sh.out && !S.over && S.ships[S.turn].human && !S.busy;
+
+  const tags = [];
+  if(sh.out) tags.push(`<span class="tag gone">Out</span>`);
+  else if(isTurn) tags.push(`<span class="tag go">${sh.human ? "Your turn" : "Playing"}</span>`);
+  if(targeted) tags.push(`<span class="tag aim">Target</span>`);
+
+  const bank = sh.bank.length
+    ? sh.bank.map((_, k) => backHTML(sh.rot.b[k] || 0)).join("")
+    : `<span class="label">none</span>`;
+
+  return `<div class="seat s${i}${isTurn ? " turn" : ""}${targeted ? " targeted" : ""}${canPick ? " pickable" : ""}${sh.out ? " out" : ""}"
+        data-seat="${i}"${canPick ? ' tabindex="0" role="button" aria-label="Aim at ' + sh.name + '"' : ""}>
+    <div class="nameline">
+      <span class="nm">${sh.name}</span>
+      <span class="hp num${sh.hp < sh.hp0 ? " hurt" : ""}">${sh.hp}</span>
+      ${tags.join("")}
+    </div>
+    <div class="rows">
+      <div class="grp">
+        <span class="label">Health</span>
+        <div class="cards">${sh.hcards.map((v, k) => faceHTML(v, sh.rot.h[k])).join("")}</div>
+      </div>
+      <div class="grp">
+        <span class="label">Shield ${sh.shield}</span>
+        <div class="cards"><div class="land">${faceHTML(sh.shield, sh.rot.s, true)}</div></div>
+      </div>
+      <div class="grp">
+        <span class="label">Charges ${sh.bank.length}</span>
+        <div class="cards">${bank}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+const tiltFixed = k => [-3, 2, -1.5, 3, -2, 1][k % 6];
+
+function middleHTML(){
+  const deck = S.deck.length
+    ? `<div class="stack">${[0, 1, 2].slice(0, Math.min(3, S.deck.length)).map((_, k) =>
+        `<div class="card" style="transform:translate(${k * 1.5}px,${k * 1.5}px) rotate(${k - 1}deg)"><svg viewBox="0 0 240 336" aria-hidden="true"><use href="#cardback"/></svg></div>`).join("")}</div>`
+    : `<div class="slot-empty"></div>`;
+  const disc = S.discard.length
+    ? `<div class="stack">${faceHTML(S.discard[S.discard.length - 1], -2)}</div>`
+    : `<div class="slot-empty"></div>`;
+
+  return `
+    <div class="piles">
+      <div class="pile">${deck}<span class="label num">Deck ${S.deck.length}</span></div>
+      <div class="pile">${disc}<span class="label num">Discard ${S.discard.length}</span></div>
+    </div>
+    <div class="played">${S.played.map((v, k) =>
+      v === null ? backHTML(tiltFixed(k)) : faceHTML(v, tiltFixed(k))).join("")}</div>
+    <p class="said">${S.said || `<span class="idle">Nothing on the table yet.</span>`}</p>`;
+}
+
+function tallyHTML(){
+  return S.ships.map(sh => `
+    <div class="col">
+      <div class="who">
+        <span>${sh.name}</span>
+        <span class="live num${sh.out ? " dead" : ""}">${sh.hp}</span>
+      </div>
+      <div class="runs num">${sh.hist.map((v, k) =>
+        `<span class="${k < sh.hist.length - 1 ? "old" : ""}" style="transform:rotate(${(k % 3) - 1}deg)">${v}</span>`
+      ).join("")}</div>
+    </div>`).join("");
+}
+
+function render(){
+  const felt = document.getElementById("felt");
+  felt.dataset.seats = String(S.seats);
+  felt.innerHTML = S.ships.map((_, i) => seatHTML(i)).join("")
+                 + `<div class="middle">${middleHTML()}</div>`;
+  document.getElementById("tally").innerHTML = tallyHTML();
+  controls();
+  document.getElementById("journal").innerHTML =
+    S.lines.map(l => `<p class="${l.c}">${l.t}</p>`).join("");
+}
+
+function controls(){
+  const box = document.getElementById("controls");
+  if(S.over){ box.innerHTML = `<span class="hint">Hand over.</span>`; return; }
+
+  const me = S.ships[S.turn];
+  if(!me.human || S.busy){
+    box.innerHTML = `<span class="hint">${me.name} is playing&hellip;</span>`;
+    return;
+  }
+
+  const n = me.bank.length;
+  const t = S.ships[S.target];
+  const dry = !S.deck.length && !S.discard.length;
+
+  if(S.armed){
+    box.innerHTML = `
+      <button class="commit" data-act="confirm">Say &ldquo;charge attack&rdquo; on ${t.name} &mdash; all ${n}</button>
+      <button data-act="cancel">Back</button>
+      <span class="hint">Binding. Blocked or not the whole bank goes, and you still don&rsquo;t know what it&rsquo;s worth.</span>`;
+    return;
+  }
+  if(dry){
+    box.innerHTML = `
+      <button data-act="attack">${n ? `Forced fire on ${t.name} &mdash; all ${n}` : `Pass`}</button>
+      <span class="hint">Nothing left to draw, so you fire what you hold.</span>`;
+    return;
+  }
+
+  const stacked = S.ships
+    .filter((s, i) => !s.out && i !== S.turn && s.bank.length >= 2)
+    .sort((a, b) => b.bank.length - a.bank.length)[0];
+
+  box.innerHTML = `
+    <button data-act="attack">Attack ${t.name}</button>
+    <button data-act="arm"${n ? "" : " disabled"}>Charge attack${n ? ` (${n})` : ""}</button>
+    <button data-act="charge">Charge</button>
+    <button data-act="swapme">Swap my shield</button>
+    <button data-act="swapfoe">Swap ${t.name}&rsquo;s</button>
+    <span class="hint">${
+      stacked
+        ? `${stacked.name} is sitting on ${stacked.bank.length}. A plain attack wipes it and costs you nothing.`
+        : me.shield < 7
+          ? `Your shield blocks only ${me.shield}. Swapping pays off under 7.`
+          : `One card averages 7. So does a shield. Click a seat to change target.`
+    }</span>`;
+}
+
+function say(t, c = ""){
+  S.lines.push({ t, c });
+  if(S.lines.length > 80) S.lines.shift();
+}
+
+/* --------------------------------------------------------------- wiring */
+document.getElementById("controls").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]");
+  if(!b || S.over || S.busy || !S.ships[S.turn].human) return;
+  const a = b.dataset.act, me = S.turn;
+
+  if(a === "arm"){ S.armed = true; render(); return; }
+  if(a === "cancel"){ S.armed = false; render(); return; }
+  if(a === "confirm"){ S.armed = false; attack(me, S.target, true); return; }
+  if(a === "attack"){
+    const dry = !S.deck.length && !S.discard.length;
+    attack(me, S.target, dry && S.ships[me].bank.length > 0);
+    return;
+  }
+  if(a === "charge") return charge(me);
+  if(a === "swapme") return swap(me, me);
+  if(a === "swapfoe") return swap(me, S.target);
+});
+
+function pickSeat(e){
+  const el = e.target.closest(".seat.pickable");
+  if(!el) return;
+  S.target = Number(el.dataset.seat);
+  render();
+}
+document.getElementById("felt").addEventListener("click", pickSeat);
+document.getElementById("felt").addEventListener("keydown", e => {
+  if(e.key === "Enter" || e.key === " "){ e.preventDefault(); pickSeat(e); }
+});
+
+document.getElementById("howBtn").addEventListener("click", e => {
+  const h = document.getElementById("howto");
+  h.hidden = !h.hidden;
+  e.currentTarget.setAttribute("aria-expanded", String(!h.hidden));
+});
+function deal(){
+  document.getElementById("over").hidden = true;
+  newGame(Number(document.getElementById("seats").value));
+}
+document.getElementById("newBtn").addEventListener("click", deal);
+document.getElementById("overBtn").addEventListener("click", deal);
+document.getElementById("seats").addEventListener("change", deal);
+
+newGame(3);
+</script>
+</body>
+</html>
