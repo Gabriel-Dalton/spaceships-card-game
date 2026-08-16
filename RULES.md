@@ -3,9 +3,9 @@
 A ship-combat card game played with a standard deck. Each player is a ship with
 **health**, a **shield**, and the ability to **charge** weapons before firing.
 
-Status: first pass, transcribed from a spoken rules explanation. Sections marked
-**[inferred]** are my reading of an ambiguous point; **Open questions** at the
-bottom lists what still needs a ruling before this is playable.
+Status: second pass. Sections marked **[inferred]** are my reading of a point
+that hasn't been ruled on yet; **Open questions** at the bottom lists what still
+needs deciding.
 
 ---
 
@@ -27,9 +27,15 @@ Each player is dealt:
 ### Reading your shield
 
 Values run 1–13, so the average card is **7**. A shield **below 7 is a
-below-average shield** — it is likely to be broken by an incoming attack, which
-is the main signal telling you to spend a turn swapping it out rather than
-attacking.
+below-average shield**.
+
+This matters more than it first looks, because **the shield is permanent**. It is
+not consumed, damaged, or destroyed by being attacked — it is a standing
+threshold that every incoming attack has to clear, on every attack, for the whole
+game. A shield only ever changes when someone deliberately **swaps** it.
+
+So a 3 is a wound you carry until you spend a turn fixing it, and a King is a
+fortress that most attacks simply cannot get through.
 
 ---
 
@@ -39,23 +45,49 @@ On your turn you take **exactly one** of three actions:
 
 ### 1. Attack
 
-Draw a card from the deck. Its value is your **attack value**, plus the value of
-any cards you have previously charged (see below).
+Draw a card from the deck. Its value, plus the value of any cards you have
+charged, is your **attack value**:
 
 ```
 attack value = drawn card + sum of your face-down charged cards
 ```
 
-You attack a chosen opponent, and the attack resolves against **their shield**.
+Choose an opponent. The attack resolves against **their shield value**.
 
-**Breaking through.** If your attack breaks through the target's shield:
+#### Resolving the attack
 
-- their shield is destroyed, and
-- **all of their charged cards are eliminated** as well.
+| Comparison | Result |
+| --- | --- |
+| `attack < shield` | **Blocked.** Nothing happens. Your charges are *not* spent — they stay banked for next turn. |
+| `attack >= shield` | **Breakthrough.** Overflow damage hits their health, their charges are eliminated, and your charges are spent. |
 
-So a successful breakthrough doesn't just strip defence — it wipes out whatever
-offence they had been banking up. A player sitting on several charges is a
-player with a lot to lose.
+Note that **equal breaks through** — an attack of exactly 7 gets past a shield of
+7.
+
+#### On a breakthrough
+
+1. **Overflow damage** is dealt to the defender's health:
+
+   ```
+   damage = attack value - shield value
+   ```
+
+   The shield's value is subtracted, not removed from play. A 10 against a 6
+   shield deals 4.
+
+2. That damage **destroys one of the defender's health cards whose value it meets
+   or exceeds**. Damage of 4 can take out a 4, a 3, an Ace — but bounces off a
+   9. If the defender has no health card the damage can reach, the attack breaks
+   through for nothing. **[inferred]** — see open question 1 on who chooses the
+   card and whether leftover damage carries over.
+
+3. **All of the defender's charged cards are eliminated.** Whatever offence they
+   had banked up is gone.
+
+4. **The attacker's charges are spent**, returning them to zero.
+
+5. **The defender's shield is untouched.** It stays exactly as it was, at the
+   same value, ready to block the next attack.
 
 ### 2. Swap a shield
 
@@ -64,57 +96,64 @@ Swap out a shield for a new card from the deck. You may swap:
 - **your own shield** — the standard use, when your shield is below average, or
 - **another player's shield** — you can swap someone else's shield.
 
-Swapping an opponent's shield is a gamble in both directions: you might replace
-a King with a 2, or hand them a better shield than the one they had.
+This is the *only* way a shield ever changes. Swapping an opponent's shield is a
+gamble in both directions: you might replace a King with a 2, or hand them a
+better shield than the one they had.
 
 ### 3. Charge
 
 Draw a card from the deck and keep it **face down** in front of you as a charge.
 It is not revealed until it is spent.
 
-Charges accumulate: the next time you attack, you add your charged card(s) to the
-value of the card you draw for the attack. Charging is how you build an attack
-big enough to break through a high shield — at the cost of doing nothing that
-turn, and at the risk of losing the whole stockpile if someone breaks your shield
-first.
+Charges accumulate, and they are the only way to build an attack big enough to
+clear a high shield — a single drawn card can never beat a King, so a fortress
+shield has to be either charged through or swapped away. The cost is a turn spent
+doing nothing, and the risk is that anyone who breaks through your shield first
+wipes the whole stockpile.
 
 ---
 
 ## Design notes
 
-The three actions form a clean rock-paper-scissors of tempo:
+The permanent shield is what gives the game its shape. Because a shield is a
+standing threshold rather than a consumable, the spread between a 2 and a King is
+enormous and lasts all game, which turns the swap action into the real
+battlefield:
 
-- **Charge** trades tempo for power.
-- **Swap** trades tempo for safety — or spends your turn messing with someone
-  else's safety.
+- Someone sitting behind a King is close to untouchable. You don't out-damage
+  that — you spend a turn swapping their shield and hope the deck hands them
+  something worse.
+- Conversely, swapping is the only repair available, so a player unlucky enough
+  to draw a low shield twice is in serious trouble.
+
+Against that, the three actions form a tempo triangle:
+
+- **Charge** trades a turn for power, and is the only route through a big shield.
+- **Swap** trades a turn for defence — or spends it wrecking someone else's.
 - **Attack** cashes in.
 
-The breakthrough rule ("break the shield, lose the charges") is the pressure
-valve that stops charging from being a free ride: the longer you bank, the more
-attractive a target you become, and everyone can see how many face-down cards
-you're sitting on even if they can't see their values.
+The breakthrough rule ("break through, lose your charges") is what stops charging
+from being a free ride. Everyone can see how many face-down cards you are sitting
+on even if they can't see the values, so a big stockpile paints a target on you.
+And because a blocked attack *doesn't* cost you your charges, throwing a
+speculative attack at a high shield is cheaper than it looks — the punishment for
+over-banking comes from other players, not from missing.
 
 ---
 
 ## Open questions
 
-These need a ruling before the game is complete:
-
-1. **How does an attack resolve against a shield?** Presumably attack value must
-   be greater than (or equal to?) the shield value to break through. What happens
-   on a *failed* attack — nothing at all, or is the shield damaged/discarded
-   anyway?
-2. **How is health actually lost?** Breaking the shield removes the shield and
-   the charges — does the target also lose a health card on that same attack, or
-   does breaking the shield merely leave them exposed for the *next* attack? Does
-   excess damage over the shield value carry through to health?
-3. **Do charges survive an attack?** Are charged cards spent when you attack
-   (returning you to zero), or do they persist? Is there a cap on how many
-   charges you can hold?
-4. **Losing and winning.** Is a player out when all 3 health cards are gone? Last
-   ship flying wins?
-5. **Shield replacement.** After a shield is broken, does the player redraw a
-   shield automatically, or must they spend a turn on the swap action to get one?
-6. **Deck exhaustion.** Reshuffle the discards, or does the game end?
-7. **Player count.** Written above as multiplayer ("choose an opponent"), which
-   the swap-someone-else's-shield rule implies. Confirm the intended count.
+1. **Health damage detail.** Confirmed: overflow damage destroys a health card it
+   meets or exceeds. Still open: does the *defender* choose which qualifying card
+   dies, or the attacker? And if damage exceeds the card destroyed, does the
+   remainder carry to a second card or is it wasted?
+2. **Charge cap.** Is there a limit on how many cards you can have charged at
+   once?
+3. **Win condition.** Player is out when all 3 health cards are gone, last ship
+   flying wins? **[inferred as yes]**
+4. **Swap commitment.** When you swap a shield, is the replacement drawn blind
+   from the deck and forced (you're stuck with whatever comes up), or can you
+   look first? Blind is assumed above.
+5. **Deck exhaustion.** Reshuffle the discards, or does the game end?
+6. **Player count and turn order.** Written as multiplayer, which the
+   swap-someone-else's-shield rule implies. Confirm the intended count.
