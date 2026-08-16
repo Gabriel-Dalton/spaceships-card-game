@@ -127,7 +127,11 @@ better shield than the one they had.
 ### 3. Charge
 
 Draw a card from the deck and keep it **face down** in front of you as a charge.
-It is not revealed until it is spent.
+
+**You may look at your own charges** at any time — they are your private
+information. Your opponents may not, so what the table can see is only **how many
+charges you have, never their total**. Charges stay face down until they are
+spent on an attack, and are revealed then.
 
 Charges accumulate with **no cap** — you may bank as many as you have patience
 for, and a long enough build produces an attack that nothing on the table can
@@ -206,6 +210,24 @@ permanent ones do.)
 
 Health is the better tiebreaker mechanically, too: totals span 3 to 39, so exact
 ties are rare, where two players sharing a shield value is common.
+
+### Hidden charges are what make the disarm a decision
+
+Charges being face down splits the information cleanly: the **count is public**
+(the cards are sitting there) while the **total is private**. That gap is the
+whole tension of the charging game.
+
+Three charges average 21 but range from 6 to 39. So an opponent looking at your
+three face-down cards knows you are probably dangerous, without knowing whether
+you are lethal — and has to decide whether to spend a whole turn disarming you on
+that hunch. Sometimes they burn a turn wiping 6 points of nothing. Sometimes they
+don't act and eat 39.
+
+Turning charges face up would collapse that into arithmetic. The table could
+price your threat exactly and disarm you on precisely the turn you became a
+problem, never a turn early or late, which makes charging strictly worse and
+removes any reason to bluff. Keeping the count visible but the values hidden is
+what leaves both the charging player and the table with a real decision.
 
 Against that, the three actions form a tempo triangle:
 
