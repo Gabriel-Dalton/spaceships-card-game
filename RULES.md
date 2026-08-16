@@ -3,7 +3,7 @@
 A ship-combat card game played with a standard deck. Each player is a ship with
 **health**, a **shield**, and the ability to **charge** weapons before firing.
 
-Status: second pass. Sections marked **[inferred]** are my reading of a point
+Status: third pass. Sections marked **[inferred]** are my reading of a point
 that hasn't been ruled on yet; **Open questions** at the bottom lists what still
 needs deciding.
 
@@ -11,7 +11,7 @@ needs deciding.
 
 ## Components
 
-- One standard deck. Card value = pip value (Ace = 1 … King = 13). **[inferred]**
+- One standard deck. Card value = pip value, **Ace = 1** through King = 13.
 - Card *orientation* on the table is meaningful and is how you tell the two
   zones apart at a glance:
   - **Vertical (portrait)** = health
@@ -49,6 +49,18 @@ game. A shield only ever changes when someone deliberately **swaps** it.
 
 So a 3 is a wound you carry until you spend a turn fixing it, and a King is a
 fortress that most attacks simply cannot get through.
+
+## Who goes first
+
+**The player with the lowest shield takes the first turn.** Ties are broken by
+the lowest starting health total; if that ties too, deal a card each and low card
+starts.
+
+Going first is a real advantage in this game (see the design notes), so the first
+turn goes to whoever the deal treated worst — and a low shield is the worst thing
+the deal can do to you.
+
+Play then proceeds clockwise.
 
 ---
 
@@ -117,8 +129,10 @@ better shield than the one they had.
 Draw a card from the deck and keep it **face down** in front of you as a charge.
 It is not revealed until it is spent.
 
-Charges accumulate, and they are the only way to build an attack big enough to
-clear a high shield — a single drawn card can never beat a King, so a fortress
+Charges accumulate with **no cap** — you may bank as many as you have patience
+for, and a long enough build produces an attack that nothing on the table can
+survive. They are the only way to build an attack big enough to clear a high
+shield — a single drawn card can never beat a King, so a fortress
 shield has to be either charged through or swapped away. The cost is a turn spent
 doing nothing, and the risk is that anyone who breaks through your shield first
 wipes the whole stockpile.
@@ -151,6 +165,33 @@ starting health, off a three-turn cycle. Two of those cycles kills someone, so a
 duel runs somewhere around a dozen turns, and every point of shield the defender
 carries is a point taken off *every* incoming hit for the rest of the game.
 
+### Why going first matters, and why the low shield gets it
+
+The charge-elimination rule creates a sharp first-mover advantage. Picture two
+players both banking charges: both charge, both charge again, and then whoever
+attacks *first* deals full damage **and** wipes the other's stockpile. The loser
+of that race spent two turns on nothing. Initiative then flips — the player who
+just fired is empty and the other rebuilds — so the game settles into alternating
+strike cycles, but the player who struck first in the opening cycle strikes first
+in every cycle after it, and lands the killing blow first.
+
+That's worth compensating for, and the low shield is the right thing to
+compensate. A shield deficit is not a one-time loss, it is a tax applied to every
+incoming attack for the entire game. A player absorbs somewhere around four to
+six attacks in a full game, so **one point of shield is worth roughly four to
+six points of health** — and more in a bigger game, where you're being shot at
+from several directions. A 4 shield against a 9 shield is a handicap on the order
+of 25 effective health, dwarfing any plausible gap in starting totals.
+
+Health makes a poorer signal for the same reason: the spread is wide (3 to 39)
+but each point is worth a fraction of a shield point, so "lowest health" hands
+the first turn to someone who may not actually be the worst off.
+
+There's also a neat self-limiting property. The low-shield player's best opening
+move is usually to **swap** — fixing the handicap — which means their first-turn
+advantage gets spent on repair rather than compounding into a won charge race.
+The compensation lands where the damage is, and doesn't overpay.
+
 Against that, the three actions form a tempo triangle:
 
 - **Charge** trades a turn for power, and is the only route through a big shield.
@@ -171,13 +212,12 @@ over-banking comes from other players, not from missing.
 1. **Starting health total.** Assumed to be the sum of your three dealt health
    cards (≈21). Confirm — the alternative is a flat starting number for everyone,
    with the cards being purely decorative.
-2. **Charge cap.** Is there a limit on how many cards you can have charged at
-   once? Uncapped, a patient player can bank toward a hit nothing can survive.
-3. **Win condition.** Player is out at 0 health, last ship flying wins?
+2. **Win condition.** Player is out at 0 health, last ship flying wins?
    **[inferred as yes]**
-4. **Swap commitment.** When you swap a shield, is the replacement drawn blind
+3. **Swap commitment.** When you swap a shield, is the replacement drawn blind
    from the deck and forced (you're stuck with whatever comes up), or can you
    look first? Blind is assumed above.
-5. **Deck exhaustion.** Reshuffle the discards, or does the game end?
-6. **Player count and turn order.** Written as multiplayer, which the
-   swap-someone-else's-shield rule implies. Confirm the intended count.
+4. **Deck exhaustion.** Reshuffle the discards, or does the game end?
+5. **Player count.** Written as multiplayer, which the swap-someone-else's-shield
+   rule implies. Confirm the intended count — the first-turn maths above assumes
+   a duel and gets more lopsided as the table grows.
