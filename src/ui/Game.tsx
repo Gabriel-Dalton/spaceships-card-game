@@ -17,6 +17,14 @@
  * are handed `features()`, the same public view the rules give you -- so the
  * coach panel showing the ace's scores gives nothing away that you were not
  * already entitled to.
+ *
+ * The room has two shapes. On a wide screen everything is on show at once:
+ * table, score sheet beside it, controls and play-by-play under it. On a phone
+ * the same markup becomes a fixed-height app: header, table, controls, nothing
+ * to scroll. The four things you only want occasionally -- the settings, the
+ * rules, the play-by-play with the score sheet, and the ace's opinion -- move
+ * into bottom sheets you pull up over the table. `panel` is the class that
+ * makes an element one of those, and it does nothing at all on a wide screen.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -84,6 +92,11 @@ export default function Game() {
   const [busy, setBusy] = useState(false);
   const [coach, setCoach] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  // On a phone these three are bottom sheets, one at a time. On a wide screen
+  // the settings and the play-by-play are simply always there, and only the
+  // rules toggle, so `showSetup` and `showLog` go unread.
+  const [showSetup, setShowSetup] = useState(false);
+  const [showLog, setShowLog] = useState(false);
   const [records, setRecords] = useState<Tallies>({});
   /** The seat a breakthrough just landed on, flashed and cleared. */
   const [hitSeat, setHitSeat] = useState(-1);
@@ -260,6 +273,24 @@ export default function Game() {
     else void document.documentElement.requestFullscreen();
   };
 
+  /** Put every bottom sheet away. Tapping the scrim behind one does this, and
+   *  so does opening another, so only one is ever up. */
+  const closePanels = useCallback(() => {
+    setShowSetup(false);
+    setShowLog(false);
+    setShowRules(false);
+    setCoach(false);
+  }, []);
+
+  // Escape closes whatever is up, the way a phone's back gesture would.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closePanels();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [closePanels]);
+
   if (!game) {
     return (
       <div className="room">
@@ -285,7 +316,7 @@ export default function Game() {
 
       <div className="topbar">
         <h1>Spaceships</h1>
-        <div className="set">
+        <div className={"set panel" + (showSetup ? " open" : "")} id="setup">
           <span className="label" id="modeLabel">
             Table
           </span>
@@ -341,20 +372,65 @@ export default function Game() {
               </option>
             ))}
           </select>
-          <button aria-expanded={showRules} onClick={() => setShowRules((s) => !s)}>
+          <button
+            aria-expanded={showRules}
+            onClick={() => {
+              const next = !showRules;
+              closePanels();
+              setShowRules(next);
+            }}
+          >
             Rules
           </button>
-          <button onClick={() => start(seats)}>Deal again</button>
+          <button
+            onClick={() => {
+              closePanels();
+              start(seats);
+            }}
+          >
+            Deal again
+          </button>
           {canFullscreen && <button onClick={fullscreen}>Full screen</button>}
-          {!watching && (
-            <span className="record">
-              vs {engineName} <b>{record.won}</b>&ndash;<s>{record.lost}</s>
-            </span>
-          )}
+          <button className="only-narrow" onClick={closePanels}>
+            Back to the table
+          </button>
+        </div>
+        {!watching && (
+          <span className="record">
+            vs {engineName} <b>{record.won}</b>&ndash;<s>{record.lost}</s>
+          </span>
+        )}
+        {/* The phone's way in to everything that is not the table itself. */}
+        <div className="barbtns only-narrow">
+          <button
+            aria-expanded={showLog}
+            aria-controls="journal"
+            onClick={() => {
+              const next = !showLog;
+              closePanels();
+              setShowLog(next);
+            }}
+          >
+            Log
+          </button>
+          <button
+            aria-expanded={showSetup}
+            aria-controls="setup"
+            onClick={() => {
+              const next = !showSetup;
+              closePanels();
+              setShowSetup(next);
+            }}
+          >
+            Setup
+          </button>
         </div>
       </div>
 
-      {showRules && <HowTo />}
+      {showRules && <HowTo onClose={closePanels} />}
+      {(showSetup || showLog || showRules) && (
+        <div className="scrim" onClick={closePanels} aria-hidden="true" />
+      )}
 
       {game.over && (
         <section className="over">
@@ -456,46 +532,53 @@ export default function Game() {
           })}
 
           <div className="middle">
-            <div className="piles">
-              <div className="pile">
-                {game.deck.length ? (
-                  <div className="stack">
-                    {[0, 1, 2].slice(0, Math.min(3, game.deck.length)).map((k) => (
-                      <div
-                        key={k}
-                        className="card"
-                        style={{ transform: `translate(${k * 1.5}px,${k * 1.5}px) rotate(${k - 1}deg)` }}
-                      >
-                        <svg viewBox="0 0 240 336" aria-hidden="true">
-                          <use href="#cardback" />
-                        </svg>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="slot-empty" />
-                )}
-                <span className="label">Deck {game.deck.length}</span>
+            {/* Nothing on a wide screen -- `display:contents`. On a phone it
+                puts the piles and the cards just played on one line, which is
+                a whole card's height of table saved. */}
+            <div className="midrow">
+              <div className="piles">
+                <div className="pile">
+                  {game.deck.length ? (
+                    <div className="stack">
+                      {[0, 1, 2].slice(0, Math.min(3, game.deck.length)).map((k) => (
+                        <div
+                          key={k}
+                          className="card"
+                          style={{
+                            transform: `translate(${k * 1.5}px,${k * 1.5}px) rotate(${k - 1}deg)`,
+                          }}
+                        >
+                          <svg viewBox="0 0 240 336" aria-hidden="true">
+                            <use href="#cardback" />
+                          </svg>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="slot-empty" />
+                  )}
+                  <span className="label">Deck {game.deck.length}</span>
+                </div>
+                <div className="pile">
+                  {game.discard.length ? (
+                    <div className="stack">
+                      <CardFace value={game.discard[game.discard.length - 1]} rot={-2} />
+                    </div>
+                  ) : (
+                    <div className="slot-empty" />
+                  )}
+                  <span className="label">Discard {game.discard.length}</span>
+                </div>
               </div>
-              <div className="pile">
-                {game.discard.length ? (
-                  <div className="stack">
-                    <CardFace value={game.discard[game.discard.length - 1]} rot={-2} />
-                  </div>
-                ) : (
-                  <div className="slot-empty" />
+              <div className="played">
+                {told.played.map((v, k) =>
+                  v === null ? (
+                    <CardBack key={k} rot={tilt(k + 3)} />
+                  ) : (
+                    <CardFace key={k} value={v} rot={tilt(k + 3)} />
+                  ),
                 )}
-                <span className="label">Discard {game.discard.length}</span>
               </div>
-            </div>
-            <div className="played">
-              {told.played.map((v, k) =>
-                v === null ? (
-                  <CardBack key={k} rot={tilt(k + 3)} />
-                ) : (
-                  <CardFace key={k} value={v} rot={tilt(k + 3)} />
-                ),
-              )}
             </div>
             <p className="said">
               {told.said ?? <span className="idle">Nothing on the table yet.</span>}
@@ -503,35 +586,9 @@ export default function Game() {
           </div>
         </div>
 
-        <aside className="sheet">
-          <div className="printed" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-          <h2>Health</h2>
-          {game.ships.map((ship, i) => (
-            <div className="col" key={i}>
-              <div className="who">
-                <span>{ship.name}</span>
-                <span className={"live" + (ship.out ? " dead" : "")}>
-                  {Math.max(0, ship.health)}
-                </span>
-              </div>
-              <div className="runs">
-                {ship.history.map((v, k) => (
-                  <span
-                    key={k}
-                    className={k < ship.history.length - 1 ? "old" : ""}
-                    style={{ transform: `rotate(${(k % 3) - 1}deg)` }}
-                  >
-                    {v}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </aside>
+        {/* Beside the table on a wide screen; on a phone it goes into the log
+            sheet, where there is room for it. */}
+        <ScoreSheet game={game} className="wide-only" />
       </div>
 
       <section className="controls">
@@ -549,7 +606,7 @@ export default function Game() {
           <span className="hint">{game.ships[game.current].name} is playing&hellip;</span>
         ) : armed ? (
           <>
-            <button className="commit" onClick={() => act(CHARGE_ATTACK)}>
+            <button className="commit prime" onClick={() => act(CHARGE_ATTACK)}>
               Say &ldquo;charge attack&rdquo; on {foe.name} &mdash; a card plus all{" "}
               {me!.bank.length}
             </button>
@@ -563,29 +620,54 @@ export default function Game() {
           </>
         ) : dry ? (
           <>
-            <button onClick={() => act(me!.bank.length ? CHARGE_ATTACK : -1)}>
+            <button className="prime" onClick={() => act(me!.bank.length ? CHARGE_ATTACK : -1)}>
               {me!.bank.length ? `Forced fire on ${foe.name} — all ${me!.bank.length}` : "Pass"}
             </button>
             <span className="hint">Nothing left to draw, so you fire what you hold.</span>
           </>
         ) : (
           <>
-            <button disabled={!legal?.[ATTACK]} onClick={() => act(ATTACK)}>
-              Attack {foe.name} — one card
+            <button className="prime" disabled={!legal?.[ATTACK]} onClick={() => act(ATTACK)}>
+              Attack {foe.name}
+              <span className="wide-only"> — one card</span>
             </button>
             <button disabled={!legal?.[CHARGE_ATTACK]} onClick={() => setArmed(true)}>
-              Charge attack{me!.bank.length ? ` — card + ${me!.bank.length}` : ""}
+              Charge attack
+              {me!.bank.length ? (
+                <>
+                  <span className="wide-only"> — card + </span>
+                  <span className="narrow-only"> +</span>
+                  {me!.bank.length}
+                </>
+              ) : null}
             </button>
             <button disabled={!legal?.[CHARGE]} onClick={() => act(CHARGE)}>
               Charge
             </button>
-            <button disabled={!legal?.[SWAP_SELF]} onClick={() => act(SWAP_SELF)}>
-              Swap my shield
+            <button
+              className="minor"
+              disabled={!legal?.[SWAP_SELF]}
+              onClick={() => act(SWAP_SELF)}
+            >
+              Swap <span className="wide-only">my shield</span>
+              <span className="narrow-only">mine</span>
             </button>
-            <button disabled={!legal?.[SWAP_TARGET]} onClick={() => act(SWAP_TARGET)}>
+            <button
+              className="minor"
+              disabled={!legal?.[SWAP_TARGET]}
+              onClick={() => act(SWAP_TARGET)}
+            >
               Swap {foe.name}&rsquo;s
             </button>
-            <button onClick={() => setCoach((c) => !c)} aria-expanded={coach}>
+            <button
+              className="minor"
+              onClick={() => {
+                const next = !coach;
+                closePanels();
+                setCoach(next);
+              }}
+              aria-expanded={coach}
+            >
               {coach ? "Hide the Ace" : "Ask the Ace"}
             </button>
             <span className="hint">{tableNote(game, human, target)}</span>
@@ -593,19 +675,70 @@ export default function Game() {
         )}
       </section>
 
-      {advice && <Coach game={game} decision={advice} />}
+      {advice && <Coach game={game} decision={advice} onClose={closePanels} />}
 
-      <section className="journal" aria-live="polite" aria-label="Play by play">
-        {lines
-          .slice()
-          .reverse()
-          .map((l) => (
-            <p key={l.id} className={l.cls}>
-              {l.text}
-            </p>
-          ))}
-      </section>
+      {/* `display:contents` on a wide screen, so the play-by-play sits under
+          the controls exactly as it always did. On a phone the wrapper is the
+          log sheet, and the score sheet rides up with it. */}
+      <div className={"logwrap panel" + (showLog ? " open" : "")}>
+        <ScoreSheet game={game} className="narrow-only" />
+        <section
+          className="journal"
+          id="journal"
+          aria-live="polite"
+          aria-label="Play by play"
+        >
+          {lines
+            .slice()
+            .reverse()
+            .map((l) => (
+              <p key={l.id} className={l.cls}>
+                {l.text}
+              </p>
+            ))}
+        </section>
+        <button className="only-narrow" onClick={closePanels}>
+          Back to the table
+        </button>
+      </div>
     </div>
+  );
+}
+
+/* ----------------------------------------------------------- score sheet */
+
+/** Health, and every value it has held, in biro on a sheet of paper. */
+function ScoreSheet({ game, className }: { game: GameState; className: string }) {
+  return (
+    <aside className={"sheet " + className}>
+      <div className="printed" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </div>
+      <h2>Health</h2>
+      {game.ships.map((ship, i) => (
+        <div className="col" key={i}>
+          <div className="who">
+            <span>{ship.name}</span>
+            <span className={"live" + (ship.out ? " dead" : "")}>
+              {Math.max(0, ship.health)}
+            </span>
+          </div>
+          <div className="runs">
+            {ship.history.map((v, k) => (
+              <span
+                key={k}
+                className={k < ship.history.length - 1 ? "old" : ""}
+                style={{ transform: `rotate(${(k % 3) - 1}deg)` }}
+              >
+                {v}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </aside>
   );
 }
 
@@ -617,9 +750,11 @@ export default function Game() {
 function Coach({
   game,
   decision,
+  onClose,
 }: {
   game: GameState;
   decision: ReturnType<typeof decide>;
+  onClose: () => void;
 }) {
   const scores = decision.scores ?? [];
   const legal = legalActions(game, game.current, decision.target);
@@ -665,7 +800,9 @@ function Coach({
   );
 
   return (
-    <section className="coach">
+    /* Down from the top on a phone, not up from the bottom: the ace's opinion
+       is worth nothing if it covers the buttons you would act on. */
+    <section className="coach panel from-top open">
       <div className="head">
         <span>The Ace, from where you are sitting</span>
         <span>self-play generation {TRAINED_GENERATION}</span>
@@ -678,6 +815,9 @@ function Coach({
         It is reading the same table you are — it cannot see the value of any face-down
         card, its own included.
       </p>
+      <button className="only-narrow" onClick={onClose}>
+        Close
+      </button>
     </section>
   );
 }
@@ -705,14 +845,14 @@ function tableNote(game: GameState, me: number, target: number): string {
   if (mine.bank.length >= 3) {
     return `${mine.bank.length} charges is about ${7 * mine.bank.length} of expected attack. Self-play fires earlier than the notes expected.`;
   }
-  return "One card averages 7. So does a shield. Click a seat to change target.";
+  return "One card averages 7. So does a shield. Tap a seat to change target.";
 }
 
 /* ----------------------------------------------------------------- how to */
 
-function HowTo() {
+function HowTo({ onClose }: { onClose: () => void }) {
   return (
-    <section className="howto">
+    <section className="howto panel open">
       <ul>
         <li>
           <b>Placement is the notation.</b> The shield sits above the health cards;
@@ -740,7 +880,7 @@ function HowTo() {
           counts as breaking through.
         </li>
         <li>
-          <b>Click a seat to aim.</b> A plain attack costs you nothing, which makes it
+          <b>Tap a seat to aim.</b> A plain attack costs you nothing, which makes it
           the cheap way to wipe somebody else&rsquo;s stockpile.
         </li>
       </ul>
@@ -749,6 +889,9 @@ function HowTo() {
         piles. No one can read a face-down card. Switch the table to <em>Watch</em> to
         sit back and let the engines play each other.
       </p>
+      <button className="only-narrow" onClick={onClose}>
+        Back to the table
+      </button>
     </section>
   );
 }

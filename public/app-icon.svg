@@ -1,0 +1,11 @@
+<!-- The home-screen icon: the compass rose off the back of the cards, on the
+     colour of the room. Square, full bleed, for platforms that use the icon
+     as drawn. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-32 -32 64 64" width="512" height="512">
+  <rect x="-32" y="-32" width="64" height="64" fill="#17150F"/>
+  <circle r="26" fill="none" stroke="#A08E52" stroke-width="2"/>
+  <circle r="20" fill="none" stroke="#A08E52" stroke-width="1" opacity=".6"/>
+  <path fill="#F7F4EC" d="M0,-24 L4.1,-4.1 L24,0 L4.1,4.1 L0,24 L-4.1,4.1 L-24,0 L-4.1,-4.1 Z"/>
+  <path fill="#79693A" opacity=".85" d="M0,-24 L4.1,-4.1 L0,0 Z M24,0 L4.1,4.1 L0,0 Z M0,24 L-4.1,4.1 L0,0 Z M-24,0 L-4.1,-4.1 L0,0 Z"/>
+  <circle r="2.8" fill="#79693A" stroke="#F7F4EC" stroke-width="1"/>
+</svg>

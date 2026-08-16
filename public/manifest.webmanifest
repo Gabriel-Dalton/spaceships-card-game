@@ -1,0 +1,26 @@
+{
+  "name": "Spaceships",
+  "short_name": "Spaceships",
+  "description": "A ship-combat card game played with one standard deck, against an opponent trained by self-play.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#17150F",
+  "theme_color": "#17150F",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "./app-icon-maskable.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ]
+}
