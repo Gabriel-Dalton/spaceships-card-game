@@ -90,7 +90,10 @@ you drew — that one draw is the whole of it.
 
 Because the declaration comes before the draw, and because you may not look at
 your own charges (see *Charge* below), the call is made blind. You are betting on
-a count, not adding up a number.
+a count, not adding up a number. Declaring after seeing your draw would hand the
+decision back the certainty the face-down rule took away — you would keep the bank
+every time the draw happened to be enough on its own, which is over half the time
+against an average shield.
 
 Choose an opponent. The attack resolves against **their shield value**.
 
@@ -110,7 +113,7 @@ very next attack.
 
 | Comparison | Result |
 | --- | --- |
-| `attack < shield` | **Blocked.** No damage. Your charges are *not* spent — they stay banked for next turn. |
+| `attack < shield` | **Blocked.** No damage. A plain attack costs you nothing; a declared charge attack **still spends its charges**. |
 | `attack >= shield` | **Breakthrough.** The excess comes off their health, their charges are eliminated, and any charges you declared are spent. |
 
 Note that **equal counts as breaking through**. An attack of exactly 7 against a
@@ -118,10 +121,16 @@ shield of 7 deals no damage at all, but it still wipes the defender's charges �
 pure disarm, and occasionally worth doing on purpose against someone sitting on a
 big stockpile.
 
-**[inferred]** A blocked *charge* attack keeps its charges, as above — but they
-have already been turned over to resolve the attack, so returning them face down
-no longer hides anything. See open question 6; this is the one place where the
-declaration rule and the no-peeking rule pull against each other.
+**Saying "charge attack" is binding.** Once the words are out you draw, you flip
+the whole bank, and the bank is gone whatever happens — through the shield or
+bounced off it. You cannot take the call back on seeing the draw, and a block is
+not a refund. A plain attack, by contrast, risks nothing at all: blocked or not,
+your charges are exactly where they were.
+
+That is what stops a charge attack from being a free look at your own stockpile.
+If a blocked bank came back to the table you would have flipped it face up for one
+turn's rent, and from then on you — and everyone else — would know exactly what it
+was worth, which is the one thing the game is built to keep from you.
 
 #### On a breakthrough
 
@@ -203,6 +212,61 @@ Blind charging doesn't change that arithmetic, because an unseen card is still
 worth 7 on average and the expected value of a stockpile is still 7 per card.
 What it changes is that you can never wait for a *good* bank, only a *big* one.
 Charge counts, not card values, are the entire language of the game.
+
+### Why the binding declaration costs almost nothing
+
+Making the call binding sounds harsh, and the arithmetic says it is nearly free.
+A charge attack only gets blocked when the bank is small, because a bank of any
+size clears any shield almost every time:
+
+| charges | vs shield 7 | vs shield 10 | vs shield 13 |
+| --- | --- | --- | --- |
+| 1 | 8.9% | 21.3% | 39.1% |
+| 2 | 0.9% | 3.8% | 10.0% |
+| 3 | 0.05% | 0.4% | 1.7% |
+| 4 | ~0% | 0.03% | 0.2% |
+
+*(chance a declared charge attack is blocked)*
+
+Multiply that by what you forfeit and the expected cost of the binding rule is
+under a third of a point once you hold three charges, even against a King. It only
+really bites on a one-charge attack into a big shield — which is precisely the
+impatient play the rule is there to discourage. So it closes the free-audit hole
+completely while costing correct play essentially nothing, which is the best trade
+a rule can make.
+
+### Disarming is the only thing holding the game together
+
+The most important number here is one that doesn't converge. Damage per turn for a
+"bank *n*, then fire" cycle keeps climbing with every charge you add:
+
+| bank size | 0 | 1 | 2 | 3 | 4 | 6 | 8 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| dmg/turn vs shield 7 | 1.6 | 3.6 | 4.7 | 5.3 | 5.6 | 6.0 | 6.2 |
+
+It rises towards 7 and never turns over, because a cycle of *n*+1 turns banks
+7(*n*+1) of expected attack and pays the shield's toll only once. **In a vacuum,
+the correct strategy is to bank forever.** Nothing internal to the charging rules
+ever makes you fire.
+
+What makes you fire is other players. Put a per-turn chance *h* of being broken
+through and wiped into the same sum and an optimum appears immediately:
+
+| disarm chance *h* | best bank vs shield 7 | vs shield 13 |
+| --- | --- | --- |
+| 10% | 3 | 4 |
+| 20% | 2 | 3 |
+| 35% | 1 | 2 |
+
+So the game's whole rhythm — two to four turn cycles, fire before you're robbed —
+is produced by the threat of disarm and by nothing else. Two consequences worth
+keeping in view. First, the uncapped stockpile is only safe because disarming is
+cheap; those two rules have to live or die together, and the free plain-attack
+disarm is what keeps *h* high enough to matter. Second, the game needs players who
+actually take the disarm shot. At a passive table, or one where everyone is busy
+attacking someone else, *h* collapses and the correct play for everybody is to sit
+there banking until the deck runs out. That is the failure mode to watch for in
+playtesting, and the first thing to check as the player count grows.
 
 ### Why going first matters, and why the low health gets it
 
@@ -304,9 +368,10 @@ for out of your own offence, so the correct response to a rival counting up to s
 charges is usually to fire a single card at them and keep banking. Over-banking is
 punished by the table, and now the table can punish it for free.
 
-A speculative attack is cheap in the other direction too: a blocked attack costs
-nothing at all, and a blocked *charge* attack keeps its charges, so throwing an
-attack at a high shield risks less than it looks.
+A speculative *plain* attack is cheap in the other direction too: blocked, it
+costs nothing but the turn. A speculative charge attack is not cheap at all, and
+that asymmetry is deliberate — probing is what the single card is for, and cashing
+in is what the bank is for.
 
 ---
 
@@ -324,23 +389,26 @@ attack at a high shield risks less than it looks.
 5. **Player count.** Written as multiplayer, which the swap-someone-else's-shield
    rule implies. Confirm the intended count — the first-turn maths above assumes
    a duel and gets more lopsided as the table grows.
-6. **A blocked charge attack has already been seen.** This is the one loose end
-   the no-peeking rule creates. To resolve a charge attack you must turn the
-   charges over, and if the attack is then blocked the rules above send them back
-   to the table face down — but the secret is out. You and the table now both know
-   exactly what that bank is worth, and every later attack from it is pure
-   arithmetic. Three ways to close it, in the order I'd rank them:
-   - **A declared charge attack always spends the charges, blocked or not.**
-     Cleanest, and it makes the declaration a genuine commitment: you can no
-     longer discover your total for free by firing at a King. Costs the
-     "blocked attacks are cheap" rule its charge-attack half.
-   - **Blocked charges are discarded and redrawn** face down, same count, new
-     cards. Keeps the information hidden and the bank alive, at the price of an
-     extra step.
-   - **Leave it as written** and accept that a blocked charge attack converts your
-     stockpile into public knowledge — arguably a fair punishment for firing into
-     a shield you couldn't clear.
-7. **Declaration timing.** Assumed above to be *before* you draw, which keeps the
-   whole decision blind. Confirm — the alternative is declaring after seeing the
-   drawn card, which lets you keep the bank when you happen to draw a King and
-   makes charge attacks noticeably stronger.
+
+### Settled since the last pass
+
+- **Blocked charge attacks burn the bank**, so a charge attack can never be used
+  as a cheap audit of your own stockpile. Costs correct play under 0.3 points of
+  expected damage from three charges up.
+- **Declaration happens before the draw**, so the fire-or-hold decision is read
+  off the table rather than off a card you just flipped.
+
+### Still needed before a solver can be written
+
+The three questions below are the ones that change the model, not just the play.
+Everything above is now precise enough to compute on; these are not.
+
+- **Player count (5).** A duel is a clean two-player zero-sum game. Three or more
+  brings in target selection and the kingmaker problem, and the disarm-hazard
+  maths above suggests multiplayer may not self-regulate.
+- **Deck exhaustion (4).** Reshuffle-the-discards makes the deck effectively
+  infinite and every draw an independent uniform 1–13, which is the model all the
+  numbers here assume. A finite deck that ends the game makes card counting real
+  and adds the remaining-deck composition to the state.
+- **Swap commitment (3).** Blind-and-forced is assumed. Look-first would make
+  swapping a much stronger action and change the shield equilibrium.
