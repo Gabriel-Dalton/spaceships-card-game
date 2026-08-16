@@ -52,13 +52,13 @@ fortress that most attacks simply cannot get through.
 
 ## Who goes first
 
-**The player with the lowest shield takes the first turn.** Ties are broken by
-the lowest starting health total; if that ties too, deal a card each and low card
+**The player with the lowest starting health total takes the first turn.** Ties
+are broken by the lowest shield; if that ties too, deal a card each and low card
 starts.
 
 Going first is a real advantage in this game (see the design notes), so the first
-turn goes to whoever the deal treated worst — and a low shield is the worst thing
-the deal can do to you.
+turn goes to whoever the deal treated worst — and the worst thing the deal can do
+to you is a low health total, because that is the one thing you can never repair.
 
 Play then proceeds clockwise.
 
@@ -165,7 +165,7 @@ starting health, off a three-turn cycle. Two of those cycles kills someone, so a
 duel runs somewhere around a dozen turns, and every point of shield the defender
 carries is a point taken off *every* incoming hit for the rest of the game.
 
-### Why going first matters, and why the low shield gets it
+### Why going first matters, and why the low health gets it
 
 The charge-elimination rule creates a sharp first-mover advantage. Picture two
 players both banking charges: both charge, both charge again, and then whoever
@@ -175,22 +175,37 @@ just fired is empty and the other rebuilds — so the game settles into alternat
 strike cycles, but the player who struck first in the opening cycle strikes first
 in every cycle after it, and lands the killing blow first.
 
-That's worth compensating for, and the low shield is the right thing to
-compensate. A shield deficit is not a one-time loss, it is a tax applied to every
-incoming attack for the entire game. A player absorbs somewhere around four to
-six attacks in a full game, so **one point of shield is worth roughly four to
-six points of health** — and more in a bigger game, where you're being shot at
-from several directions. A 4 shield against a 9 shield is a handicap on the order
-of 25 effective health, dwarfing any plausible gap in starting totals.
+That advantage is worth compensating for, and the principle is: **compensate the
+handicap the player cannot fix.**
 
-Health makes a poorer signal for the same reason: the spread is wide (3 to 39)
-but each point is worth a fraction of a shield point, so "lowest health" hands
-the first turn to someone who may not actually be the worst off.
+A bad shield is fixable. Swapping is a blind draw, so it has a positive expected
+return whenever your shield is below 7 and a negative one above it — which gives
+the game a natural equilibrium where players swap up until they're
+above average, then stop. A 3 shield costs you a turn or two and a bit of bad
+luck absorbed in the meantime, and then it's simply gone as a problem. The player
+has a lever, and they can pull it whenever they like.
 
-There's also a neat self-limiting property. The low-shield player's best opening
-move is usually to **swap** — fixing the handicap — which means their first-turn
-advantage gets spent on repair rather than compounding into a won charge race.
-The compensation lands where the damage is, and doesn't overpay.
+A bad health total is forever. There is no healing anywhere in this game: your
+three dealt cards are the entire budget you will ever have. Deal one player 3+4+5
+and another 11+12+13, and that 27-point gap persists to the end of the game no
+matter how well the short-changed player plays. No action on their turn touches
+it.
+
+That asymmetry decides it. Handing the first turn to a low-shield player is
+mostly letting them fix a fixable problem one turn sooner — the compensation gets
+absorbed by the repair rather than offsetting anything permanent. The low-health
+player, by contrast, has nothing to repair, so they spend the opening turn
+charging and genuinely take the initiative in the first strike cycle. The
+compensation arrives undiluted, and it goes to the only deficit that lasts.
+
+(It's tempting to argue the other way from raw numbers — a point of shield is
+subtracted from every incoming attack, so it looks several times more valuable
+than a point of health. That reasoning only holds if the shield *stays* where the
+deal put it, and it doesn't. Transient handicaps don't need compensating;
+permanent ones do.)
+
+Health is the better tiebreaker mechanically, too: totals span 3 to 39, so exact
+ties are rare, where two players sharing a shield value is common.
 
 Against that, the three actions form a tempo triangle:
 
