@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spaceships</title>
+<style>
+/* ------------------------------------------------------------------ tokens
+   Palette is lifted from the card back itself: gold ink on cream stock,
+   laid on a warm near-black table. Single visual world by choice, so every
+   colour is painted explicitly rather than inherited from the host theme. */
+:root{
+  --gold:      #A08E52;
+  --gold-lit:  #C3AF6F;
+  --gold-deep: #79693A;
+  --stock:     #F3EFE3;
+  --stock-dim: #DCD5BF;
+
+  --table:     #14130E;
+  --table-hi:  #1F1D14;
+  --panel:     #1A180F;
+  --rule:      #3C3624;
+  --rule-soft: #29251A;
+
+  --text:      #EAE4D3;
+  --text-dim:  #A79E82;
+  --text-mute: #7B735C;
+
+  --danger:    #B94F33;
+  --danger-lo: #5E2618;
+  --live:      #93A15C;
+
+  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Times New Roman", serif;
+
+  --cw: 60px;
+  --gap: 14px;
+}
+
+*{ box-sizing:border-box; }
+
+html,body{ margin:0; padding:0; }
+
+body{
+  background:
+    radial-gradient(115% 80% at 50% 0%, #211E15 0%, rgba(20,19,14,0) 62%),
+    var(--table);
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.55;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sprite{ position:absolute; width:0; height:0; overflow:hidden; }
+
+/* ------------------------------------------------------------- typography */
+.label{
+  font-size: .62rem;
+  text-transform: uppercase;
+  letter-spacing: .2em;
+  color: var(--text-mute);
+  font-weight: 400;
+}
+.num{ font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ shell */
+.wrap{
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 22px 18px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.masthead{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+  border-bottom:1px solid var(--rule-soft);
+  padding-bottom:12px;
+}
+.masthead h1{
+  margin:0;
+  font-size: clamp(1.5rem, 4.2vw, 2.1rem);
+  font-weight:400;
+  letter-spacing:.28em;
+  text-transform:uppercase;
+  color: var(--stock);
+}
+.masthead .sub{
+  margin:2px 0 0;
+  font-size:.8rem;
+  color:var(--text-dim);
+  font-style:italic;
+  letter-spacing:.01em;
+}
+.mast-actions{ display:flex; gap:8px; }
+
+/* ----------------------------------------------------------------- button */
+button{
+  font-family: var(--serif);
+  font-size:.72rem;
+  text-transform:uppercase;
+  letter-spacing:.16em;
+  color: var(--stock);
+  background: linear-gradient(#242113, #1A180F);
+  border:1px solid var(--rule);
+  border-radius:2px;
+  padding:9px 14px;
+  cursor:pointer;
+  transition: border-color .16s, color .16s, background .16s;
+}
+button:hover:not(:disabled){ border-color: var(--gold); color: var(--gold-lit); }
+button:focus-visible{ outline:2px solid var(--gold-lit); outline-offset:2px; }
+button:disabled{ color: var(--text-mute); border-color: var(--rule-soft); cursor:not-allowed; opacity:.55; }
+button.ghost{ background:transparent; }
+button.commit{
+  border-color: var(--danger);
+  color:#E9BFAE;
+  background: linear-gradient(#2E170F, #1F110B);
+}
+button.commit:hover:not(:disabled){ border-color:var(--danger); color:#F6DDD2; }
+
+/* ------------------------------------------------------------------ ships */
+.ship{
+  border:1px solid var(--rule-soft);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.017), rgba(0,0,0,.12)),
+    var(--panel);
+  padding:14px 16px;
+  display:grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 18px 22px;
+  align-items:start;
+}
+.ship.active{ border-color: var(--gold-deep); }
+.ship .who{
+  grid-column:1 / -1;
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  border-bottom:1px solid var(--rule-soft);
+  padding-bottom:8px;
+  margin-bottom:2px;
+}
+.ship .who .name{
+  font-size:.82rem;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--stock);
+}
+.ship .who .turnflag{
+  font-size:.6rem;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--gold-lit);
+  border:1px solid var(--gold-deep);
+  padding:2px 7px;
+  border-radius:2px;
+}
+.ship .who .dead{ color:var(--danger); border-color:var(--danger-lo); }
+
+.stat{ display:flex; flex-direction:column; gap:6px; }
+.hp{
+  font-size:2.5rem;
+  line-height:.95;
+  color:var(--stock);
+  letter-spacing:.02em;
+}
+.hp.hurt{ color:var(--danger); }
+.hp .of{ font-size:.85rem; color:var(--text-mute); letter-spacing:.1em; }
+
+.slot{ display:flex; flex-direction:column; gap:6px; }
+.slot-row{ display:flex; align-items:flex-end; gap:6px; min-height: calc(var(--cw) * 1.4); }
+
+/* charges overlap slightly, like a real fan on the table */
+.bank{ display:flex; align-items:flex-end; }
+.bank .card{ margin-left: calc(var(--cw) * -0.62); }
+.bank .card:first-child{ margin-left:0; }
+.bank-empty{ font-size:.78rem; color:var(--text-mute); font-style:italic; }
+
+/* ----------------------------------------------------------------- cards */
+.card{
+  width: var(--cw);
+  height: calc(var(--cw) * 1.4);
+  border-radius: 4px;
+  background: var(--stock);
+  box-shadow: 0 1px 0 rgba(255,255,255,.14) inset, 0 3px 9px rgba(0,0,0,.5);
+  flex: 0 0 auto;
+  position:relative;
+  overflow:hidden;
+}
+.card svg{ display:block; width:100%; height:100%; }
+
+/* health cards stay portrait, shields lie landscape -- the orientation rule */
+/* a rotated card keeps its portrait layout box, so take it out of flow and
+   give the wrapper the landscape footprint explicitly */
+.land{
+  position:relative;
+  width: calc(var(--cw) * 1.4);
+  height: var(--cw);
+  flex:0 0 auto;
+}
+.land .card{
+  position:absolute;
+  top:50%; left:50%;
+  transform: translate(-50%,-50%) rotate(90deg);
+}
+
+.face{
+  position:absolute; inset:0;
+  display:grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 5px 5px 4px;
+  color: var(--gold-deep);
+}
+.face::before{
+  content:"";
+  position:absolute;
+  inset:3px;
+  border:1px solid var(--gold);
+  border-radius:2px;
+  opacity:.55;
+}
+.face .pip{
+  font-size: calc(var(--cw) * 0.24);
+  line-height:1;
+  letter-spacing:.02em;
+  color: var(--gold-deep);
+  position:relative;
+}
+.face .pip.bot{ transform: rotate(180deg); }
+.face .mid{
+  display:grid;
+  place-items:center;
+  position:relative;
+}
+.face .mid .big{
+  font-size: calc(var(--cw) * 0.46);
+  line-height:1;
+  color: var(--gold);
+}
+.face .mid svg{ width: calc(var(--cw) * 0.34); height: calc(var(--cw) * 0.34); opacity:.75; }
+
+/* --------------------------------------------------------------- midline */
+.midline{
+  display:grid;
+  grid-template-columns: auto 1fr;
+  gap:18px 24px;
+  align-items:start;
+  border:1px solid var(--rule-soft);
+  border-left:2px solid var(--gold-deep);
+  background: var(--felt);
+  padding:14px 16px;
+}
+.piles{ display:flex; gap:18px; }
+.pile{ display:flex; flex-direction:column; gap:6px; align-items:center; }
+.pile .count{ font-size:.9rem; color:var(--text-dim); }
+.stack{ position:relative; width:var(--cw); height:calc(var(--cw) * 1.4); }
+.stack .card{ position:absolute; inset:0; }
+.stack .card:nth-child(1){ transform: translate(3px,3px); opacity:.5; }
+.stack .card:nth-child(2){ transform: translate(1.5px,1.5px); opacity:.75; }
+.empty-pile{
+  width:var(--cw); height:calc(var(--cw) * 1.4);
+  border:1px dashed var(--rule); border-radius:4px;
+}
+
+/* -------------------------------------------------------------- the stage */
+.stage{ display:flex; flex-direction:column; gap:8px; min-height: 96px; }
+.stage-cards{ display:flex; gap:5px; align-items:flex-end; flex-wrap:wrap; }
+.stage-cards .card{ animation: deal .26s ease-out both; }
+@keyframes deal{ from{ transform: translateY(-9px) rotate(-2deg); opacity:0; } to{ transform:none; opacity:1; } }
+.verdict{ font-size:.95rem; color:var(--text); }
+.verdict .hit{ color:var(--danger); }
+.verdict .blocked{ color:var(--text-dim); }
+.verdict em{ color:var(--gold-lit); font-style:normal; }
+.stage-idle{ color:var(--text-mute); font-style:italic; font-size:.88rem; }
+
+/* ---------------------------------------------------------------- actions */
+.actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  border:1px solid var(--rule-soft);
+  background: var(--panel);
+  padding:13px 16px;
+  align-items:center;
+}
+.actions .hint{
+  font-size:.76rem;
+  color:var(--text-dim);
+  font-style:italic;
+  margin-left:auto;
+  text-align:right;
+}
+
+/* -------------------------------------------------------------------- log */
+.log{
+  border:1px solid var(--rule-soft);
+  background: var(--panel);
+  padding:12px 16px;
+  max-height: 168px;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column-reverse;
+  gap:5px;
+  font-size:.84rem;
+}
+.log p{ margin:0; color:var(--text-dim); }
+.log p strong{ color:var(--stock); font-weight:400; }
+.log p.big{ color:var(--text); }
+.log p.dmg strong{ color:var(--danger); }
+.log p.sys{ color:var(--text-mute); font-style:italic; }
+
+/* ------------------------------------------------------------------ rules */
+.sheet{
+  border:1px solid var(--rule-soft);
+  background: var(--panel);
+  padding:16px 18px;
+}
+.sheet[hidden]{ display:none; }
+.sheet h2{
+  margin:0 0 10px;
+  font-size:.72rem; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--gold-lit); font-weight:400;
+}
+.sheet ul{ margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:7px; }
+.sheet li{ font-size:.88rem; color:var(--text-dim); }
+.sheet li b{ color:var(--stock); font-weight:400; }
+
+.banner{
+  border:1px solid var(--gold-deep);
+  background: linear-gradient(#241F12, #191509);
+  padding:16px 18px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+}
+.banner .msg{ font-size:1.1rem; color:var(--stock); letter-spacing:.06em; }
+.banner .msg.lost{ color:var(--danger); }
+.banner[hidden]{ display:none; }
+
+@media (max-width: 720px){
+  :root{ --cw: 46px; }
+  .ship{ grid-template-columns: 1fr; gap:14px; }
+  .midline{ grid-template-columns: 1fr; }
+  .actions .hint{ margin-left:0; text-align:left; flex-basis:100%; }
+}
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+
+/* -------------------------------------------------- card back internals */
+.cb-stock{ fill: var(--stock); }
+.cb-gold{ fill: var(--gold); }
+.cb-hair{ fill:none; stroke: var(--stock); stroke-width:1; opacity:.85; }
+/* fill stays none: the stippled rect underneath must show through */
+.cb-panel{ fill: none; stroke: var(--stock); stroke-width:1.4; }
+.cb-orn{ fill:none; stroke: var(--stock); stroke-width:1.15; stroke-linecap:round; }
+.cb-orn-fill{ fill: var(--stock); stroke:none; }
+.cb-dot{ fill: var(--stock); opacity:.6; }
+.rose-star{ fill: var(--stock); }
+.rose-shade{ fill: var(--gold-deep); opacity:.85; }
+.rose-ring{ fill:none; stroke: var(--stock); stroke-width:1.1; }
+.rose-teeth{ fill:none; stroke: var(--stock); stroke-width:4.6; stroke-dasharray:2.2 3.6; }
+.rose-hub{ fill: var(--gold-deep); stroke: var(--stock); stroke-width:1; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ sprite === -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="stipple" width="7" height="7" patternUnits="userSpaceOnUse">
+      <circle class="cb-dot" cx="1.75" cy="1.75" r="1.05"/>
+      <circle class="cb-dot" cx="5.25" cy="5.25" r="1.05"/>
+    </pattern>
+
+    <!-- corner rosette, masking the joins where the bands meet -->
+    <g id="orn-corner">
+      <circle class="cb-orn" r="9.5"/>
+      <circle class="cb-orn-fill" r="2.4"/>
+      <g id="orn-petal-set">
+        <path class="cb-orn-fill" d="M0,-9 C2.4,-7.2 3.4,-5.4 3.4,-3.6 C3.4,-1.8 1.8,-0.9 0,-0.9 C-1.8,-0.9 -3.4,-1.8 -3.4,-3.6 C-3.4,-5.4 -2.4,-7.2 0,-9 Z"/>
+      </g>
+      <use href="#orn-petal-set" transform="rotate(90)"/>
+      <use href="#orn-petal-set" transform="rotate(180)"/>
+      <use href="#orn-petal-set" transform="rotate(270)"/>
+      <path class="cb-orn" d="M-6.7,-6.7 L-9.9,-9.9 M6.7,-6.7 L9.9,-9.9 M-6.7,6.7 L-9.9,9.9 M6.7,6.7 L9.9,9.9"/>
+    </g>
+
+    <!-- the repeating arabesque: a palmette flanked by leafed C-scrolls.
+         Tiled along all four bands so the border reads as continuous foliage. -->
+    <g id="orn-unit">
+      <path class="cb-orn-fill" d="M0,2 C2.2,5.4 3.2,8.6 3.2,11.6 C3.2,14.6 2,17.6 0,21 C-2,17.6 -3.2,14.6 -3.2,11.6 C-3.2,8.6 -2.2,5.4 0,2 Z"/>
+      <path class="cb-orn" d="M0,21 L0,26.5"/>
+      <path class="cb-orn-fill" d="M0,24 C1.5,25.4 2.2,26.8 2.2,28.4 C2.2,29.4 1.2,30 0,30 C-1.2,30 -2.2,29.4 -2.2,28.4 C-2.2,26.8 -1.5,25.4 0,24 Z"/>
+
+      <path class="cb-orn" d="M-2.6,9 C-7,7.4 -11,7.8 -14.6,10.4 C-17.6,12.6 -19.4,15.8 -20,20"/>
+      <path class="cb-orn" d="M2.6,9 C7,7.4 11,7.8 14.6,10.4 C17.6,12.6 19.4,15.8 20,20"/>
+      <path class="cb-orn-fill" d="M-4,15.4 C-7.6,12.6 -11.6,11.6 -16,12.4 C-12.8,14.4 -10.6,17.4 -9.6,21.4 C-7.4,18.6 -5.6,16.6 -4,15.4 Z"/>
+      <path class="cb-orn-fill" d="M4,15.4 C7.6,12.6 11.6,11.6 16,12.4 C12.8,14.4 10.6,17.4 9.6,21.4 C7.4,18.6 5.6,16.6 4,15.4 Z"/>
+      <path class="cb-orn" d="M-20,20 C-19.4,23.2 -17.4,25 -14.6,25 C-12.6,25 -11.2,23.6 -11.2,21.8"/>
+      <path class="cb-orn" d="M20,20 C19.4,23.2 17.4,25 14.6,25 C12.6,25 11.2,23.6 11.2,21.8"/>
+      <circle class="cb-orn-fill" cx="-16.4" cy="5.6" r="1.5"/>
+      <circle class="cb-orn-fill" cx="16.4" cy="5.6" r="1.5"/>
+      <path class="cb-orn" d="M-8.6,4.4 C-10.6,2.6 -13,2 -15.4,3"/>
+      <path class="cb-orn" d="M8.6,4.4 C10.6,2.6 13,2 15.4,3"/>
+    </g>
+
+    <!-- compass rose -->
+    <symbol id="rose" viewBox="-32 -32 64 64">
+      <circle class="rose-ring" r="30.5"/>
+      <circle class="rose-teeth" r="27"/>
+      <circle class="rose-ring" r="23"/>
+      <circle class="rose-ring" r="19.5" opacity=".6"/>
+      <path class="rose-star" d="M0,-27 L4.6,-4.6 L27,0 L4.6,4.6 L0,27 L-4.6,4.6 L-27,0 L-4.6,-4.6 Z"/>
+      <path class="rose-shade" d="M0,-27 L4.6,-4.6 L0,0 Z M27,0 L4.6,4.6 L0,0 Z M0,27 L-4.6,4.6 L0,0 Z M-27,0 L-4.6,-4.6 L0,0 Z"/>
+      <path class="rose-star" d="M14,-14 L5.2,-2.6 L2.6,-5.2 Z M14,14 L2.6,5.2 L5.2,2.6 Z M-14,14 L-5.2,2.6 L-2.6,5.2 Z M-14,-14 L-2.6,-5.2 L-5.2,-2.6 Z" opacity=".75"/>
+      <circle class="rose-hub" r="3.1"/>
+    </symbol>
+
+    <!-- the card back -->
+    <symbol id="cardback" viewBox="0 0 240 336">
+      <rect class="cb-stock" width="240" height="336" rx="7"/>
+      <rect class="cb-gold" x="13" y="13" width="214" height="310"/>
+      <rect class="cb-hair" x="19.5" y="19.5" width="201" height="297"/>
+
+      <use href="#orn-unit" transform="translate(76,20)"/>
+      <use href="#orn-unit" transform="translate(120,20)"/>
+      <use href="#orn-unit" transform="translate(164,20)"/>
+      <use href="#orn-unit" transform="translate(76,316) scale(1,-1)"/>
+      <use href="#orn-unit" transform="translate(120,316) scale(1,-1)"/>
+      <use href="#orn-unit" transform="translate(164,316) scale(1,-1)"/>
+
+      <use href="#orn-unit" transform="translate(20,78) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(20,123) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(20,168) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(20,213) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(20,258) rotate(-90)"/>
+      <use href="#orn-unit" transform="translate(220,78) rotate(90)"/>
+      <use href="#orn-unit" transform="translate(220,123) rotate(90)"/>
+      <use href="#orn-unit" transform="translate(220,168) rotate(90)"/>
+      <use href="#orn-unit" transform="translate(220,213) rotate(90)"/>
+      <use href="#orn-unit" transform="translate(220,258) rotate(90)"/>
+
+      <use href="#orn-corner" transform="translate(34,34)"/>
+      <use href="#orn-corner" transform="translate(206,34)"/>
+      <use href="#orn-corner" transform="translate(34,302)"/>
+      <use href="#orn-corner" transform="translate(206,302)"/>
+
+      <rect x="49" y="53" width="142" height="230" fill="url(#stipple)" stroke="none"/>
+      <rect class="cb-panel" x="49" y="53" width="142" height="230" fill="none"/>
+      <rect class="cb-hair" x="53" y="57" width="134" height="222" opacity=".5"/>
+
+      <use href="#rose" x="82" y="72" width="76" height="76"/>
+      <use href="#rose" x="82" y="188" width="76" height="76"/>
+
+      <circle class="cb-orn-fill" cx="57" cy="61" r="1.6"/>
+      <circle class="cb-orn-fill" cx="183" cy="61" r="1.6"/>
+      <circle class="cb-orn-fill" cx="57" cy="275" r="1.6"/>
+      <circle class="cb-orn-fill" cx="183" cy="275" r="1.6"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ============================================================== page === -->
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <h1>Spaceships</h1>
+      <p class="sub">Three health, one shield, and a bank of charges nobody can read &mdash; not even you.</p>
+    </div>
+    <div class="mast-actions">
+      <button class="ghost" id="rulesBtn" aria-expanded="false">Rules</button>
+      <button class="ghost" id="newBtn">New game</button>
+    </div>
+  </header>
+
+  <section class="sheet" id="rulesSheet" hidden>
+    <h2>How it plays</h2>
+    <ul>
+      <li><b>Orientation is the notation.</b> Health cards stand upright, the shield lies on its side. Health is a running total on paper; the cards only record where you started.</li>
+      <li><b>The shield is permanent.</b> It blocks its own value on every single attack, all game, and never wears down. Only a swap ever changes it.</li>
+      <li><b>Charges are blind.</b> A charge goes from the deck to the table face down and unseen &mdash; by the table <em>and</em> by you. Everyone knows the count; nobody knows the total.</li>
+      <li><b>Say &ldquo;charge attack&rdquo; first, or not at all.</b> Declared before the draw, it commits the whole bank &mdash; all or nothing. A plain attack is just the one card and never touches your charges.</li>
+      <li><b>The declaration is binding.</b> Blocked or not, a declared bank is spent. Equal counts as breaking through, so an exact tie deals nothing but still wipes the defender&rsquo;s charges.</li>
+      <li><b>Breaking through disarms.</b> The excess comes off health and the defender&rsquo;s whole bank is destroyed. Their shield is untouched.</li>
+      <li><b>Cards recycle.</b> Every action draws one. When the deck runs out the discards are reshuffled, so the game only ever ends on health.</li>
+    </ul>
+  </section>
+
+  <section class="banner" id="banner" hidden>
+    <span class="msg" id="bannerMsg"></span>
+    <button id="bannerBtn">Play again</button>
+  </section>
+
+  <section class="ship" id="shipFoe" aria-label="Adversary"></section>
+
+  <section class="midline">
+    <div class="piles">
+      <div class="pile">
+        <span class="label">Deck</span>
+        <div id="deckPile"></div>
+        <span class="count num" id="deckCount">0</span>
+      </div>
+      <div class="pile">
+        <span class="label">Discard</span>
+        <div id="discardPile"></div>
+        <span class="count num" id="discardCount">0</span>
+      </div>
+    </div>
+    <div class="stage">
+      <span class="label">The table</span>
+      <div class="stage-cards" id="stageCards"></div>
+      <p class="verdict" id="verdict"><span class="stage-idle">Nothing fired yet.</span></p>
+    </div>
+  </section>
+
+  <section class="ship" id="shipYou" aria-label="Your ship"></section>
+
+  <section class="actions" id="actions"></section>
+
+  <section class="log" id="log" aria-live="polite" aria-label="Game log"></section>
+</div>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ deck */
+const RANK = {1:"A",11:"J",12:"Q",13:"K"};
+const FULL = {1:"Ace",11:"Jack",12:"Queen",13:"King"};
+const rankName = v => RANK[v] || String(v);          // pip, for the card face
+const rankFull = v => FULL[v] || String(v);          // spoken name
+const rankWord = v => (v === 1 || v === 8 ? "an " : "a ") + rankFull(v);
+
+function freshDeck(){
+  const d = [];
+  for(let v=1; v<=13; v++) for(let s=0; s<4; s++) d.push(v);
+  return shuffle(d);
+}
+function shuffle(a){
+  const x = a.slice();
+  for(let i=x.length-1; i>0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [x[i],x[j]] = [x[j],x[i]];
+  }
+  return x;
+}
+
+/* ----------------------------------------------------------------- state */
+let S;
+
+function newGame(){
+  S = {
+    deck: freshDeck(),
+    discard: [],
+    stage: { cards: [], verdict: null },
+    busy: false,
+    over: false,
+    armed: false,          // charge attack awaiting confirmation
+    ships: [
+      { name:"Adversary", human:false, hcards:[], hp:0, hp0:0, shield:0, bank:[] },
+      { name:"Your ship", human:true,  hcards:[], hp:0, hp0:0, shield:0, bank:[] }
+    ],
+    logLines: []
+  };
+
+  for(const sh of S.ships){
+    sh.hcards = [rawDraw(), rawDraw(), rawDraw()];
+    sh.hp0 = sh.hcards.reduce((a,b)=>a+b, 0);
+    sh.hp = sh.hp0;
+    sh.shield = rawDraw();
+  }
+
+  // lowest starting health total goes first; ties to the lower shield
+  const [foe, you] = S.ships;
+  let first;
+  if(you.hp0 !== foe.hp0)          first = you.hp0 < foe.hp0 ? 1 : 0;
+  else if(you.shield !== foe.shield) first = you.shield < foe.shield ? 1 : 0;
+  else                              first = Math.random() < .5 ? 1 : 0;
+  S.turn = first;
+
+  log(`Dealt. You start on <strong>${you.hp0}</strong> health behind ${rankWord(you.shield)} shield; the Adversary on <strong>${foe.hp0}</strong> behind ${rankWord(foe.shield)}.`, "big");
+  log(`${S.ships[first].human ? "You go" : "The Adversary goes"} first &mdash; lowest starting health takes the opening turn.`, "sys");
+
+  render();
+  if(!S.ships[S.turn].human) setTimeout(aiTurn, 1000);
+}
+
+function rawDraw(){ return S.deck.pop(); }
+
+/* Draw one card, reshuffling the discards if the deck is out.
+   Returns null only when there is genuinely nothing anywhere. */
+function draw(){
+  if(!S.deck.length){
+    if(!S.discard.length) return null;
+    S.deck = shuffle(S.discard);
+    S.discard = [];
+    log("Deck exhausted. Discards reshuffled.", "sys");
+  }
+  return S.deck.pop();
+}
+
+const foeOf = i => 1 - i;
+
+/* ------------------------------------------------------------- resolution */
+function resolveAttack(mi, declared){
+  const me = S.ships[mi], foe = S.ships[foeOf(mi)];
+  const bank = declared ? me.bank.slice() : [];
+  const card = draw();
+  const forced = card === null;
+
+  const total = (card || 0) + bank.reduce((a,b)=>a+b, 0);
+  const broke = total >= foe.shield;
+  const dmg = broke ? total - foe.shield : 0;
+
+  S.stage.cards = [];
+  if(card !== null) S.stage.cards.push({ v:card, tag:"drawn" });
+  for(const c of bank) S.stage.cards.push({ v:c, tag:"charge" });
+
+  if(broke){
+    foe.hp = Math.max(0, foe.hp - dmg);
+    if(foe.bank.length) S.discard.push(...foe.bank.splice(0));
+  }
+  if(card !== null) S.discard.push(card);
+  if(declared){ S.discard.push(...bank); me.bank.length = 0; }
+
+  const who = me.human ? "You" : "The Adversary";
+  const their = me.human ? "their" : "your";
+  const label = declared ? "charge attack" : "attack";
+
+  let v = `<em>${total}</em> against ${rankWord(foe.shield)} shield &mdash; `;
+  if(broke && dmg > 0)  v += `<span class="hit">breakthrough, ${dmg} damage.</span>`;
+  else if(broke)        v += `<span class="hit">exactly level. No damage, but the bank is wiped.</span>`;
+  else                  v += `<span class="blocked">blocked.</span>`;
+  S.stage.verdict = v;
+
+  if(forced) log(`${who} cannot draw, so ${me.human?"you":"it"} must fire &mdash; the bank alone.`, "sys");
+
+  const detail = card !== null
+    ? `draws ${rankWord(card)}${bank.length ? ` and flips ${bank.length} charge${bank.length>1?"s":""}` : ""}`
+    : `flips ${bank.length} charge${bank.length>1?"s":""} with no card to draw`;
+
+  if(broke && dmg > 0){
+    log(`${who} ${label === "charge attack" ? "declares <strong>charge attack</strong> and " : ""}${detail} for <strong>${total}</strong>. Through the ${rankFull(foe.shield)} for <strong>${dmg}</strong>.`, "dmg");
+  } else if(broke){
+    log(`${who} ${detail} for <strong>${total}</strong> &mdash; exactly the shield. No damage, but ${their} bank is gone.`);
+  } else {
+    log(`${who} ${detail} for <strong>${total}</strong>. The ${rankFull(foe.shield)} holds.`);
+  }
+  if(broke && declared === false && me.bank.length){
+    log(`${who} kept ${me.bank.length} charge${me.bank.length>1?"s":""} &mdash; undeclared charges are never spent.`, "sys");
+  }
+
+  endTurn();
+}
+
+function resolveCharge(mi){
+  const me = S.ships[mi];
+  const card = draw();
+  if(card === null){
+    log("Nothing left to draw. You must fire instead.", "sys");
+    return;
+  }
+  me.bank.push(card);
+  S.stage.cards = [{ v:null, tag:"facedown" }];
+  S.stage.verdict = `<span class="stage-idle">Banked face down, unseen. ${me.bank.length} charge${me.bank.length>1?"s":""} held.</span>`;
+  log(`${me.human?"You charge":"The Adversary charges"}. <strong>${me.bank.length}</strong> banked, value unknown to anyone.`);
+  endTurn();
+}
+
+function resolveSwap(mi, ti){
+  const me = S.ships[mi], t = S.ships[ti];
+  const card = draw();
+  if(card === null){
+    log("Nothing left to draw. You must fire instead.", "sys");
+    return;
+  }
+  const old = t.shield;
+  t.shield = card;
+  S.discard.push(old);
+  S.stage.cards = [{ v:card, tag:"drawn" }];
+  const dir = card > old ? "better" : card < old ? "worse" : "the same";
+  S.stage.verdict = `<em>${rankName(old)}</em> swapped for <em>${rankName(card)}</em> &mdash; ${dir}.`;
+
+  const whose = mi === ti ? (me.human ? "their own" : "its own") : (t.human ? "your" : "the Adversary&rsquo;s");
+  log(`${me.human?"You swap":"The Adversary swaps"} ${mi===ti ? (me.human?"your own":"its own") : whose} shield: ${rankName(old)} out, <strong>${rankName(card)}</strong> in.`);
+  endTurn();
+}
+
+function endTurn(){
+  const foe = S.ships[0], you = S.ships[1];
+  if(foe.hp <= 0 || you.hp <= 0){
+    S.over = true;
+    render();
+    finish();
+    return;
+  }
+  S.turn = foeOf(S.turn);
+  S.armed = false;
+  render();
+  if(!S.ships[S.turn].human){
+    S.busy = true;
+    render();
+    setTimeout(() => { S.busy = false; aiTurn(); }, 1600);   // long enough to read your own result
+  }
+}
+
+function finish(){
+  const you = S.ships[1], foe = S.ships[0];
+  const won = foe.hp <= 0 && you.hp > 0;
+  const banner = document.getElementById("banner");
+  const msg = document.getElementById("bannerMsg");
+  msg.textContent = won
+    ? "The Adversary is out. Last ship flying."
+    : "Your ship is out.";
+  msg.className = "msg" + (won ? "" : " lost");
+  banner.hidden = false;
+  log(won ? "<strong>The Adversary is destroyed.</strong>" : "<strong>Your ship is destroyed.</strong>", "big");
+}
+
+/* -------------------------------------------------------------------- AI */
+function aiTurn(){
+  if(S.over) return;
+  const mi = 0, me = S.ships[0], foe = S.ships[1];
+  const n = me.bank.length;
+
+  // repair a bad shield first -- swapping has positive expectation below 7
+  if(me.shield <= 5){ resolveSwap(mi, mi); return; }
+
+  // a plain attack disarms for free, so punish a growing bank
+  if(foe.bank.length >= 3 && foe.shield <= 7){ resolveAttack(mi, false); return; }
+
+  // cash in on a full bank, or when the count alone looks lethal
+  if(n >= 3){ resolveAttack(mi, true); return; }
+  if(n >= 1 && 7 * (n + 1) >= foe.hp + foe.shield){ resolveAttack(mi, true); return; }
+
+  // nothing to draw means forced fire
+  if(!S.deck.length && !S.discard.length){ resolveAttack(mi, n > 0); return; }
+
+  resolveCharge(mi);
+}
+
+/* ---------------------------------------------------------------- render */
+function cardBack(){
+  return `<div class="card"><svg viewBox="0 0 240 336" role="img" aria-label="face-down card"><use href="#cardback"/></svg></div>`;
+}
+function cardFace(v){
+  const r = rankName(v);
+  return `<div class="card"><div class="face" role="img" aria-label="${r}">
+    <div class="pip num">${r}</div>
+    <div class="mid"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#rose" x="0" y="0" width="64" height="64"/></svg></div>
+    <div class="pip bot num">${r}</div>
+  </div></div>`;
+}
+
+function shipHTML(i){
+  const sh = S.ships[i];
+  const mine = sh.human;
+  const isTurn = S.turn === i && !S.over;
+  const dead = sh.hp <= 0;
+  const lost = sh.hp0 - sh.hp;
+
+  const flag = dead
+    ? `<span class="turnflag dead">Destroyed</span>`
+    : isTurn ? `<span class="turnflag">${mine ? "Your turn" : "Thinking"}</span>` : "";
+
+  const bank = sh.bank.length
+    ? `<div class="bank">${sh.bank.map(cardBack).join("")}</div>`
+    : `<span class="bank-empty">No charges banked.</span>`;
+
+  return `
+    <div class="who">
+      <span class="name">${sh.name}</span>
+      ${flag}
+    </div>
+
+    <div class="stat">
+      <span class="label">Health</span>
+      <div class="hp num ${lost > 0 ? "hurt" : ""}">${sh.hp}<span class="of"> / ${sh.hp0}</span></div>
+      <div class="slot-row" style="min-height:0">
+        ${sh.hcards.map(cardFace).join("")}
+      </div>
+      <span class="label">Dealt ${sh.hcards.map(rankName).join(" &middot; ")}</span>
+    </div>
+
+    <div class="stat">
+      <span class="label">Shield</span>
+      <div class="slot-row">
+        <div class="land">${cardFace(sh.shield)}</div>
+      </div>
+      <span class="label">Blocks ${sh.shield} every hit</span>
+    </div>
+
+    <div class="stat">
+      <span class="label">Charges &mdash; ${sh.bank.length} held</span>
+      <div class="slot-row">${bank}</div>
+      <span class="label">Face down${mine ? ", even to you" : ""}</span>
+    </div>`;
+}
+
+function pile(el, count, useBack){
+  if(!count){ el.innerHTML = `<div class="empty-pile"></div>`; return; }
+  const n = Math.min(3, count);
+  el.innerHTML = `<div class="stack">${Array.from({length:n}, () => useBack ? cardBack() : cardFace(S.discard[S.discard.length-1])).join("")}</div>`;
+}
+
+function render(){
+  document.getElementById("shipFoe").innerHTML = shipHTML(0);
+  document.getElementById("shipYou").innerHTML = shipHTML(1);
+  document.getElementById("shipFoe").classList.toggle("active", S.turn === 0 && !S.over);
+  document.getElementById("shipYou").classList.toggle("active", S.turn === 1 && !S.over);
+
+  pile(document.getElementById("deckPile"), S.deck.length, true);
+  pile(document.getElementById("discardPile"), S.discard.length, false);
+  document.getElementById("deckCount").textContent = S.deck.length;
+  document.getElementById("discardCount").textContent = S.discard.length;
+
+  const sc = document.getElementById("stageCards");
+  sc.innerHTML = S.stage.cards.map(c => c.v === null ? cardBack() : cardFace(c.v)).join("");
+  document.getElementById("verdict").innerHTML =
+    S.stage.verdict || `<span class="stage-idle">Nothing fired yet.</span>`;
+
+  renderActions();
+  renderLog();
+}
+
+function renderActions(){
+  const box = document.getElementById("actions");
+  const you = S.ships[1], foe = S.ships[0];
+  const myTurn = S.turn === 1 && !S.over && !S.busy;
+  const n = you.bank.length;
+  const dry = !S.deck.length && !S.discard.length;
+
+  if(S.over){
+    box.innerHTML = `<span class="hint">Game over.</span>`;
+    return;
+  }
+  if(!myTurn){
+    box.innerHTML = `<span class="hint">The Adversary is taking its turn&hellip;</span>`;
+    return;
+  }
+
+  if(S.armed){
+    box.innerHTML = `
+      <button class="commit" data-act="confirm">Commit all ${n} charge${n>1?"s":""}</button>
+      <button class="ghost" data-act="cancel">Back</button>
+      <span class="hint">Binding. Blocked or not, the whole bank is spent &mdash; and you still don&rsquo;t know what it&rsquo;s worth.</span>`;
+  } else if(dry){
+    box.innerHTML = `
+      <button data-act="attack">${n ? `Forced fire &mdash; ${n} charge${n>1?"s":""}` : "Pass"}</button>
+      <span class="hint">Nothing left to draw, so you must fire what you have.</span>`;
+  } else {
+    box.innerHTML = `
+      <button data-act="attack">Attack</button>
+      <button data-act="arm" ${n ? "" : "disabled"}>Charge attack${n ? ` (${n})` : ""}</button>
+      <button data-act="charge">Charge</button>
+      <button data-act="swapme">Swap my shield</button>
+      <button data-act="swapfoe">Swap theirs</button>
+      <span class="hint">${
+        you.shield < 7
+          ? `Your shield blocks only ${you.shield} &mdash; swapping pays off under 7.`
+          : foe.bank.length >= 3
+            ? `They&rsquo;re holding ${foe.bank.length}. A plain attack disarms without costing your bank.`
+            : `One card averages 7. So does their shield.`
+      }</span>`;
+  }
+}
+
+function renderLog(){
+  document.getElementById("log").innerHTML =
+    S.logLines.map(l => `<p class="${l.cls}">${l.text}</p>`).join("");
+}
+function log(text, cls=""){
+  S.logLines.push({ text, cls });
+  if(S.logLines.length > 60) S.logLines.shift();
+}
+
+/* --------------------------------------------------------------- wiring */
+document.getElementById("actions").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-act]");
+  if(!btn || S.over || S.busy || S.turn !== 1) return;
+  const act = btn.dataset.act;
+
+  if(act === "arm"){    S.armed = true;  render(); return; }
+  if(act === "cancel"){ S.armed = false; render(); return; }
+  if(act === "confirm"){ S.armed = false; resolveAttack(1, true); return; }
+
+  if(act === "attack"){
+    const dry = !S.deck.length && !S.discard.length;
+    resolveAttack(1, dry && S.ships[1].bank.length > 0);
+    return;
+  }
+  if(act === "charge")  return resolveCharge(1);
+  if(act === "swapme")  return resolveSwap(1, 1);
+  if(act === "swapfoe") return resolveSwap(1, 0);
+});
+
+document.getElementById("rulesBtn").addEventListener("click", e => {
+  const sheet = document.getElementById("rulesSheet");
+  sheet.hidden = !sheet.hidden;
+  e.currentTarget.setAttribute("aria-expanded", String(!sheet.hidden));
+});
+
+function restart(){
+  document.getElementById("banner").hidden = true;
+  newGame();
+}
+document.getElementById("newBtn").addEventListener("click", restart);
+document.getElementById("bannerBtn").addEventListener("click", restart);
+
+newGame();
+</script>
+</body>
+</html>
