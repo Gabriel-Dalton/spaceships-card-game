@@ -1,0 +1,13 @@
+<!-- The same icon for platforms that crop it to their own shape. Everything
+     that matters sits inside the middle 80%, which is the safe zone a
+     maskable icon is allowed to keep. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-32 -32 64 64" width="512" height="512">
+  <rect x="-32" y="-32" width="64" height="64" fill="#17150F"/>
+  <g transform="scale(0.78)">
+    <circle r="26" fill="none" stroke="#A08E52" stroke-width="2.4"/>
+    <circle r="20" fill="none" stroke="#A08E52" stroke-width="1.2" opacity=".6"/>
+    <path fill="#F7F4EC" d="M0,-24 L4.1,-4.1 L24,0 L4.1,4.1 L0,24 L-4.1,4.1 L-24,0 L-4.1,-4.1 Z"/>
+    <path fill="#79693A" opacity=".85" d="M0,-24 L4.1,-4.1 L0,0 Z M24,0 L4.1,4.1 L0,0 Z M0,24 L-4.1,4.1 L0,0 Z M-24,0 L-4.1,-4.1 L0,0 Z"/>
+    <circle r="2.8" fill="#79693A" stroke="#F7F4EC" stroke-width="1.2"/>
+  </g>
+</svg>

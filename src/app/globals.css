@@ -45,10 +45,20 @@ body{
   font-size:16px;
   line-height:1.5;
   min-height:100vh;
+  min-height:100dvh;
+  /* no rubber-band, no pull-to-refresh: the table should feel like a table
+     and not like a web page that happens to have one on it */
+  overscroll-behavior:none;
   -webkit-font-smoothing:antialiased;
 }
 
 .sprite{ position:absolute; width:0; height:0; overflow:hidden; }
+
+/* Shown at one width and not the other. `.panel` is inert here and becomes a
+   bottom sheet in the narrow block at the foot of this file. */
+.only-narrow, .narrow-only{ display:none; }
+.scrim{ display:none; }
+.midrow, .logwrap{ display:contents; }
 
 .label{
   font-size:.57rem; text-transform:uppercase; letter-spacing:.18em;
@@ -71,8 +81,9 @@ body{
   margin:0; font-size:1.2rem; font-weight:400;
   letter-spacing:.3em; text-transform:uppercase; color:#EFEADB;
 }
-.topbar .set{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.topbar .set{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:auto; }
 .topbar .label{ color:#8C846E; }
+.barbtns{ gap:8px; }
 
 button, select{
   font-family: var(--serif); font-size:.68rem;
@@ -81,12 +92,21 @@ button, select{
   border:1px solid #3D3624; border-radius:2px;
   padding:8px 13px; cursor:pointer;
   transition:border-color .15s, color .15s;
+  /* no double-tap zoom, no grey flash, no stuck :hover after a tap */
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
 }
-button:hover:not(:disabled), select:hover{ border-color:var(--gold); color:var(--gold-lit); }
+@media (hover: hover){
+  button:hover:not(:disabled), select:hover{ border-color:var(--gold); color:var(--gold-lit); }
+}
+button:active:not(:disabled){ border-color:var(--gold); color:var(--gold-lit); }
 button:focus-visible, select:focus-visible{ outline:2px solid var(--gold-lit); outline-offset:2px; }
 button:disabled{ opacity:.45; cursor:not-allowed; }
 button.commit{ border-color:#8C3A24; color:#F0C6B6; background:#2C160E; }
-button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
+@media (hover: hover){
+  button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
+}
+button.commit:active:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
 
 /* the running score against this opponent, kept between sessions */
 .record{
@@ -118,6 +138,8 @@ button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
   gap:8px;
   color:var(--ink);
   overflow:hidden;
+  /* a long press on a seat should aim, not select the name under your thumb */
+  -webkit-user-select:none; user-select:none;
 }
 /* the seam across the table top, as in the room this was drawn from */
 .felt::after{
@@ -135,8 +157,11 @@ button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
 }
 .seat.turn{ border-color:var(--gold); background:rgba(160,142,82,.12); }
 .seat.targeted{ border-color:var(--danger); background:rgba(168,64,42,.08); }
-.seat.pickable{ cursor:pointer; }
-.seat.pickable:hover{ border-color:var(--danger); }
+.seat.pickable{ cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+@media (hover: hover){
+  .seat.pickable:hover{ border-color:var(--danger); }
+}
+.seat.pickable:active{ border-color:var(--danger); background:rgba(168,64,42,.08); }
 .seat.pickable:focus-visible{ outline:2px solid var(--danger); outline-offset:2px; }
 .seat.out{ opacity:.4; }
 /* a breakthrough just landed here: the seat takes the blow visibly */
@@ -230,7 +255,8 @@ button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
   content:""; position:absolute; inset:2.5px;
   border:1px solid var(--gold); border-radius:2px; opacity:.5;
 }
-.face .pip{ font-size:calc(var(--cw)*.26); line-height:1; position:relative; }
+/* the rank never shrinks past legibility, however small the table gets */
+.face .pip{ font-size:max(9px, calc(var(--cw)*.26)); line-height:1; position:relative; }
 .face .pip.bot{ transform:rotate(180deg); }
 .face .mid{ display:grid; place-items:center; position:relative; }
 .face .mid svg{ width:calc(var(--cw)*.36); height:calc(var(--cw)*.36); opacity:.7; }
@@ -337,16 +363,298 @@ button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
 .howto p{ font-size:.8rem; color:#7B735C; margin:10px 0 0; }
 .howto a{ color:var(--gold-lit); }
 
-@media (max-width: 920px){
-  .felt-wrap{ grid-template-columns:1fr; }
-  .sheet{ width:auto; transform:none; }
+/* =================================================================== phones
+   Under 900px the room stops being a page and becomes an app: one screen
+   high, nothing to scroll, the table taking every pixel the header and the
+   controls leave it. The score sheet, the play-by-play, the settings and the
+   rules move into sheets you pull up over the table when you want them.
+
+   None of the markup changes between the two. */
+@media (max-width: 900px){
+  html{ height:100%; }
+  body{ height:100%; min-height:0; overflow:hidden; }
+
+  .only-narrow, .narrow-only{ display:revert; }
+  .wide-only{ display:none; }
+
+  .room{
+    max-width:none;
+    height:100vh; height:100dvh;
+    min-height:0;
+    overflow:hidden;
+    gap:7px;
+    padding:
+      calc(7px + env(safe-area-inset-top))
+      calc(9px + env(safe-area-inset-right))
+      calc(7px + env(safe-area-inset-bottom))
+      calc(9px + env(safe-area-inset-left));
+  }
+
+  /* ------------------------------------------------------------- the header
+     One line: the name, the running score, and the two ways off the table.
+     It stays live above the scrim, so Log and Setup swap straight from one to
+     the other instead of needing a dismissing tap first. */
+  .topbar{ flex-wrap:nowrap; align-items:center; gap:8px; position:relative; z-index:45; }
+  .topbar h1{ font-size:.8rem; letter-spacing:.2em; white-space:nowrap; }
+  .record{
+    border-left:0; padding-left:0; margin-left:auto;
+    font-size:.58rem; white-space:nowrap;
+  }
+  .barbtns{ display:flex; flex:0 0 auto; }
+  .barbtns button{ padding:7px 10px; font-size:.58rem; min-height:34px; }
+
+  /* --------------------------------------------------------------- the table
+     `container-type:size` makes the wrapper a measuring stick: whatever
+     height is left over after the header and the controls, the cards are cut
+     to fit it. That is what keeps the table off the bottom of the screen no
+     matter how many buttons the turn happens to need. */
+  .felt-wrap{ display:block; flex:1 1 auto; min-height:0; }
+  .felt{
+    height:100%; min-height:0;
+    padding:8px 7px; gap:4px;
+    grid-template-columns:repeat(6, 1fr);
+    justify-items:stretch;
+    /* Seven card-heights stack up the table -- shield and hand for each of
+       the two long sides, and the piles between them -- with ~176px of names,
+       labels, captions and gaps around them. Solve that for the card.
+
+       Three goes at the same sum, each better than the last, each behind the
+       support it needs: `vh` is wrong on a phone by the height of the browser
+       chrome, `svh` is right about the screen but has to guess at the header
+       and the controls, and the container query measures what the table was
+       actually given. A custom property holding an unsupported unit poisons
+       everything that reads it, so these cannot simply be stacked. */
+    --cw: clamp(24px, min(11.5vw, (100vh - 440px) / 7), 54px);
+  }
+  @supports (height: 100svh){
+    .felt{ --cw: clamp(24px, min(11.5vw, (100svh - 400px) / 7), 54px); }
+  }
+  @supports (container-type: size){
+    .felt-wrap{ container-type:size; }
+    .felt{ --cw: clamp(22px, min(16cqw, (100cqh - 176px) / 7), 54px); }
+    /* the more seats, the less width each one gets */
+    .felt[data-seats="3"]{ --cw: clamp(22px, min(11cqw, (100cqh - 176px) / 7), 54px); }
+    .felt[data-seats="4"]{ --cw: clamp(20px, min(8cqw, (100cqh - 176px) / 7), 54px); }
+  }
+  /* three opponents abreast: the charge count wraps rather than shoves the
+     hand out of its seat */
+  .felt[data-seats="4"] .label{ white-space:normal; text-align:center; }
+  .felt[data-seats="4"] .tableau{ column-gap:5px; }
+
+  /* Opponents across the top, you along the bottom, the piles between. */
+  .felt[data-seats="2"] .s0{ grid-area:1 / 1 / 2 / 7; }
+  .felt[data-seats="2"] .s1{ grid-area:3 / 1 / 4 / 7; }
+  .felt[data-seats="3"] .s0{ grid-area:1 / 1 / 2 / 4; }
+  .felt[data-seats="3"] .s1{ grid-area:1 / 4 / 2 / 7; }
+  .felt[data-seats="3"] .s2{ grid-area:3 / 1 / 4 / 7; }
+  .felt[data-seats="4"] .s0{ grid-area:1 / 1 / 2 / 3; }
+  .felt[data-seats="4"] .s1{ grid-area:1 / 3 / 2 / 5; align-self:start; }
+  .felt[data-seats="4"] .s2{ grid-area:1 / 5 / 2 / 7; align-self:start; }
+  .felt[data-seats="4"] .s3{ grid-area:3 / 1 / 4 / 7; }
+  .middle{ grid-area:2 / 1 / 3 / 7; }
+
+  .seat{ align-items:center; padding:4px 5px; gap:4px; }
+  .nameline{ gap:6px; justify-content:center; row-gap:2px; }
+  .nameline .nm{ font-size:.62rem; letter-spacing:.1em; }
+  .nameline .hp{ font-size:1.2rem; }
+  .nameline .engine{ display:none; }
+
+  /* The tableau centres itself in the seat, but the shield still has to sit
+     over the health cards and not over the gap beside them -- so the two of
+     them share a column and the charges take the one next to it. */
+  .tableau{
+    display:grid; grid-template-columns:auto auto;
+    column-gap:9px; row-gap:4px;
+    justify-content:center; align-items:end;
+  }
+  .rows{ display:contents; }
+  .shieldrow{ grid-area:1 / 1; justify-content:center; }
+  .grp{ grid-area:2 / 1; align-items:center; }
+  .grp.charges{ grid-area:1 / 2 / 3 / 3; align-self:end; }
+  .grp .cards{ min-width:var(--cw); justify-content:center; }
+  .grp .cards .card + .card{ margin-left:calc(var(--cw) * -.42); }
+  .label{ font-size:.5rem; letter-spacing:.1em; white-space:nowrap; }
+
+  /* the piles and the cards just played share one line */
+  .midrow{ display:flex; align-items:flex-start; justify-content:center; gap:14px; }
+  .middle{ gap:5px; justify-content:center; }
+  .piles{ gap:12px; }
+  .played{ flex-wrap:nowrap; }
+  .said{ font-size:.78rem; max-width:34ch; line-height:1.35; }
+
+  /* ------------------------------------------------------------ the controls
+     Thumb-sized, in reach, and never more than they need to be: the attack
+     across the width, the two swaps and the ace on a shorter row under it. */
+  .controls{
+    display:grid; grid-template-columns:repeat(6, 1fr); gap:6px;
+    padding:8px; overflow-y:auto; flex:0 0 auto;
+    max-height:44vh; max-height:44dvh;
+  }
+  .controls button{
+    grid-column:span 3; min-height:46px; padding:8px 6px;
+    font-size:.6rem; letter-spacing:.08em; line-height:1.25;
+  }
+  .controls button.prime{ grid-column:span 6; }
+  .controls button.minor{ grid-column:span 2; min-height:40px; font-size:.54rem; }
+  .controls .hint{
+    grid-column:span 6; margin:0; text-align:left; font-size:.72rem;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
+    overflow:hidden;
+  }
+
+  .over{ padding:9px 11px; gap:8px; flex:0 0 auto; }
+  .over .msg{ font-size:.86rem; }
+  .over button{ min-height:42px; }
+
+  /* ---------------------------------------------------------- bottom sheets
+     Everything that is not the table. One at a time, over a scrim, dismissed
+     by tapping away from it or by the button at the foot of it. */
+  .scrim{
+    display:block; position:fixed; inset:0; z-index:40;
+    background:rgba(12,10,7,.66);
+    animation:fadein .16s ease-out;
+  }
+  .panel{
+    position:fixed; z-index:50; left:0; right:0; bottom:0;
+    max-height:82vh; max-height:82dvh;
+    overflow-y:auto; overscroll-behavior:contain;
+    background:#1D1A11;
+    border:1px solid #3D3624; border-bottom:0;
+    border-radius:13px 13px 0 0;
+    padding:
+      15px
+      calc(15px + env(safe-area-inset-right))
+      calc(17px + env(safe-area-inset-bottom))
+      calc(15px + env(safe-area-inset-left));
+    box-shadow:0 -20px 44px rgba(0,0,0,.62);
+    animation:rise .2s ease-out;
+  }
+  .panel.from-top{
+    bottom:auto; top:0;
+    border-radius:0 0 13px 13px; border-top:0; border-bottom:1px solid #3D3624;
+    padding-top:calc(15px + env(safe-area-inset-top));
+    box-shadow:0 20px 44px rgba(0,0,0,.62);
+    animation:fall .2s ease-out;
+  }
+  .panel > .only-narrow{
+    display:block; width:100%; margin-top:13px; min-height:46px;
+  }
+  @keyframes rise{ from{ transform:translateY(14px); opacity:0; } }
+  @keyframes fall{ from{ transform:translateY(-14px); opacity:0; } }
+  @keyframes fadein{ from{ opacity:0; } }
+
+  /* settings: label and control in two columns, at a size a thumb can hit
+     and iOS will not zoom into */
+  .topbar .set{ display:none; }
+  .topbar .set.open{
+    display:grid; grid-template-columns:auto 1fr; align-items:center;
+    gap:9px 12px; margin-left:0;
+  }
+  .topbar .set.open .label{ text-align:right; font-size:.56rem; }
+  .topbar .set.open select{
+    width:100%; min-height:44px; font-size:16px; letter-spacing:.06em;
+    text-transform:none;
+  }
+  .topbar .set.open button{ grid-column:1 / -1; min-height:46px; font-size:.66rem; }
+
+  /* the play-by-play, with the score sheet riding up alongside it */
+  .logwrap{ display:none; }
+  .logwrap.open{ display:block; }
+  .sheet.wide-only{ display:none; }
+  .sheet{ width:auto; transform:none; margin-bottom:12px; }
+  .journal{ max-height:44vh; max-height:44dvh; border:0; background:none; padding:0; font-size:.85rem; }
+
+  /* the rules and the ace are panels in their own right, so they keep the
+     panel's own ground -- only their type is resized here */
+  .howto ul{ gap:9px; }
+  .howto li, .howto p{ font-size:.86rem; }
+  .coach .verdict{ font-size:.96rem; }
+  .coach .head{ flex-wrap:wrap; row-gap:2px; }
+
+  /* The verdict is a native dialog, so it comes up in the top layer over
+     sheets and table alike -- it only needs the width of the phone and
+     buttons a thumb can land on. */
+  .verdict-box{
+    width:calc(100vw - 26px); max-width:none;
+    max-height:82vh; max-height:82dvh; overflow-y:auto;
+    padding:
+      20px
+      calc(18px + env(safe-area-inset-right))
+      calc(20px + env(safe-area-inset-bottom))
+      calc(18px + env(safe-area-inset-left));
+  }
+  .verdict-box .headline{ font-size:1.26rem; }
+  .verdict-box .blow{ font-size:.88rem; }
+  .verdict-box .tally{ margin-bottom:15px; }
+  .verdict-box .set{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .verdict-box .set button{ min-height:46px; padding:8px 6px; font-size:.6rem; }
+  .verdict-box .set button.commit{ grid-column:1 / -1; }
 }
-@media (max-width: 620px){
-  :root{ --cw:38px; }
-  .felt{ padding:9px; min-height:0; }
-  .controls .hint{ margin-left:0; text-align:left; flex-basis:100%; }
-  .record{ border-left:0; padding-left:0; }
+
+/* A small phone held upright -- an SE, a Mini. Same layout, everything around
+   the cards pared back so the cards themselves stay worth looking at. */
+@media (max-width: 900px) and (max-height: 720px) and (orientation: portrait){
+  .room{ gap:5px; }
+  .felt{ padding:5px; gap:3px; }
+  .seat{ padding:2px 4px; gap:2px; }
+  .nameline .hp{ font-size:1.05rem; }
+  .nameline .nm{ font-size:.58rem; }
+  .tableau{ gap:3px; }
+  .middle{ gap:3px; }
+  .said{
+    font-size:.72rem; line-height:1.3;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    overflow:hidden;
+  }
+  .controls{ padding:6px; gap:5px; }
+  .controls button{ min-height:42px; }
+  .controls button.minor{ min-height:36px; }
+  .controls .hint{ font-size:.68rem; -webkit-line-clamp:2; }
+  @supports (container-type: size){
+    .felt{ --cw: clamp(20px, min(13cqw, (100cqh - 132px) / 7), 54px); }
+  }
 }
+
+/* Short and wide -- a phone on its side. The controls go down the right-hand
+   edge so the table keeps the height it has left. */
+@media (max-width: 900px) and (max-height: 560px) and (orientation: landscape){
+  .room{
+    display:grid; gap:6px;
+    grid-template-columns:1fr minmax(168px, 232px);
+    grid-template-rows:auto minmax(0,1fr);
+    align-content:stretch;
+  }
+  .topbar{ grid-column:1 / -1; }
+  .felt-wrap{ grid-column:1; grid-row:2; }
+  .over{ grid-column:1 / -1; }
+  /* one button per line down the rail: there is height to spare here and no
+     width at all, so nothing is worth wrapping */
+  .controls{
+    grid-column:2; grid-row:2; align-self:stretch;
+    grid-template-columns:1fr; max-height:none; align-content:start;
+    overflow-y:auto;
+  }
+  .controls button,
+  .controls button.prime,
+  .controls button.minor{ grid-column:1; min-height:38px; font-size:.56rem; }
+  .controls .hint{ grid-column:1; -webkit-line-clamp:4; font-size:.64rem; }
+  .felt{ --cw: clamp(20px, (100vh - 210px) / 7, 44px); }
+  @supports (height: 100svh){
+    .felt{ --cw: clamp(20px, (100svh - 200px) / 7, 44px); }
+  }
+  @supports (container-type: size){
+    .felt{ --cw: clamp(20px, min(13cqw, (100cqh - 152px) / 7), 44px); }
+    .felt[data-seats="3"]{ --cw: clamp(20px, min(11cqw, (100cqh - 152px) / 7), 44px); }
+    .felt[data-seats="4"]{ --cw: clamp(18px, min(8cqw, (100cqh - 152px) / 7), 44px); }
+  }
+  .said{
+    font-size:.7rem;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1;
+    overflow:hidden;
+  }
+  .panel{ max-height:92vh; max-height:92dvh; }
+}
+
 @media (prefers-reduced-motion: reduce){
   *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
 }

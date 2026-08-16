@@ -45,6 +45,7 @@ The full rules, with the reasoning behind each one, are in **[RULES.md](RULES.md
 ```
 RULES.md            the rules, and the design notes arguing for them
 src/                the playable web app: game engine, opponents, table UI
+public/             the home-screen icons and the web manifest
 tests/              the rules tests, and parity tests against the ML engine
 game/index.html     an older single-file version, no build step
 analysis/           the arithmetic the rules were designed against
@@ -89,6 +90,24 @@ pace instead of thirty-five thousand games a second.
 Every opponent sees only what you see. Charges are face down to everybody —
 the engines are handed the public state of the table, never the values of the
 face-down cards, and the test suite asserts exactly that.
+
+#### On a phone
+
+The table is meant to be played standing up on a bus, so on a narrow screen it
+stops being a page and becomes one screen you never scroll. The header, the
+table and the buttons divide the height between them, and the cards are cut to
+whatever the table is left with — so the whole game is in front of you at two,
+three or four seats, on a 4.7&Prime; phone as much as on a tablet.
+
+The four things you only want occasionally move out of the way into sheets you
+pull up over the table: **Setup** (who you are playing, how many, how fast, and
+the rules), **Log** (the play-by-play, with the score sheet), **Ask the Ace**
+(which comes down from the top so your buttons stay live under it), and the
+rules themselves. Tap a seat to aim, tap away from a sheet to put it back.
+Turned on its side the buttons move to a rail down the right-hand edge.
+
+Add it to your home screen and it opens without the browser's chrome, which is
+most of a card's height back.
 
 #### Deploy it on Vercel
 
@@ -192,3 +211,11 @@ the model rather than just the play.
 - **Human results as evidence.** The web app records your results against each
   engine; enough games against the Ace is playtest data the design notes can
   actually use.
+- **Finish the progressive web app.** The manifest is there, so a phone will
+  already install it to the home screen and open it without browser chrome.
+  What is missing is the half that needs a service worker: the game working
+  with no signal at all — it is a static export with the opponent's weights in
+  the bundle, so there is nothing it needs the network for once it has loaded —
+  along with a prompt to install rather than a buried browser menu, and the
+  running record surviving a cache clear. Worth doing in that order; offline is
+  the one that changes where the game can be played.
