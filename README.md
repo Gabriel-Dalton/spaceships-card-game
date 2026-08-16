@@ -5,8 +5,8 @@ player is a ship with **health**, a **shield**, and the ability to **charge**
 weapons before firing. Two to six players, about a dozen turns for a duel.
 
 Suits are ignored entirely. Only the number on the card matters, Ace = 1 through
-King = 13, and how the card is turned on the table: **vertical is health,
-horizontal is shield.**
+King = 13, and where the card sits in front of you: **the shield above, the
+health cards below it.**
 
 ## The game in one minute
 
@@ -77,6 +77,14 @@ There is an **Ask the Ace** button on your turn: it shows what the trained
 network would do from your seat, with its five action scores, so you can
 practice against its judgement and not just its results. The scoreboard in the
 top bar keeps your running record against each opponent between sessions.
+
+The table has two uses, switched in the top bar. **Play** is the game: you at
+the near edge, learning against the ladder at whatever pace suits you — the
+engines take their turns slowly enough to watch, and a seat flashes when a
+breakthrough lands on it. **Watch** takes you out of the deal and sits the
+engines against each other — Ace against Officer in a duel, the whole ladder
+at a bigger table — which is the self-play arena from `ml/` run at a human
+pace instead of thirty-five thousand games a second.
 
 Every opponent sees only what you see. Charges are face down to everybody —
 the engines are handed the public state of the table, never the values of the

@@ -1,12 +1,17 @@
 "use client";
 
 /**
- * The table, and the person sitting at it.
+ * The table, and the person sitting at it -- or standing behind it.
  *
  * All of the game logic lives in `src/game`; this file is the room around it.
- * It holds one `Game` value, hands the engines their turns on a timer so a
- * move can be read as it happens, and turns each resolved event into cards on
- * the felt and a line in the journal.
+ * It holds one `Game` value, hands the engines their turns on a clock slow
+ * enough to watch, and turns each resolved event into cards on the felt, a
+ * line under them, and an entry in the play-by-play.
+ *
+ * Two ways to use the room. **Play** seats you at the near edge against the
+ * opponent you chose. **Watch** takes you out of the deal entirely and sits
+ * the engines against each other -- the self-play arena from `ml/`, run at a
+ * human pace instead of thirty-five thousand games a second.
  *
  * Nothing here can see a face-down card. The opponents cannot either -- they
  * are handed `features()`, the same public view the rules give you -- so the
@@ -38,8 +43,21 @@ import { CardBack, CardFace, Sprite, rankName, tilt } from "./Cards.tsx";
 import { narrate, type Told } from "./narrate.tsx";
 
 const SHIP_NAMES = ["Kino", "Hudson", "Frane"];
-const THINKING_MS = 850;
 const RECORD_KEY = "spaceships:record:v2";
+
+type Mode = "play" | "watch";
+
+/** How long an engine sits on its move. The result then stays on the table
+ *  for the whole of the next think, so every move gets read twice over. */
+const PACES = [
+  { id: "slow", name: "Slow", ms: 3200 },
+  { id: "normal", name: "Normal", ms: 2200 },
+  { id: "fast", name: "Fast", ms: 1100 },
+] as const;
+type PaceId = (typeof PACES)[number]["id"];
+
+/** Who sits where in watch mode: the ladder, strongest first. */
+const WATCH_LADDER: EngineId[] = ["ace", "officer", "gunner", "cadet"];
 
 /** Games won and lost against each opponent, kept in localStorage. */
 type Tally = { won: number; lost: number };
@@ -54,8 +72,10 @@ interface Line {
 const blank: Told = { played: [], said: null, lines: [] };
 
 export default function Game() {
+  const [mode, setMode] = useState<Mode>("play");
   const [seats, setSeats] = useState(2);
   const [engine, setEngine] = useState<EngineId>("ace");
+  const [pace, setPace] = useState<PaceId>("normal");
   const [game, setGame] = useState<GameState | null>(null);
   const [target, setTarget] = useState(0);
   const [armed, setArmed] = useState(false);
@@ -65,10 +85,23 @@ export default function Game() {
   const [coach, setCoach] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [records, setRecords] = useState<Tallies>({});
+  /** The seat a breakthrough just landed on, flashed and cleared. */
+  const [hitSeat, setHitSeat] = useState(-1);
+  const [canFullscreen, setCanFullscreen] = useState(false);
   const lineId = useRef(0);
+  const hitTimer = useRef(0);
   // One stream for the cadet's coin flips. Created lazily so the server-side
   // render and the first client render agree.
   const rng = useRef(makeRng(1)).current;
+
+  const paceMs = PACES.find((p) => p.id === pace)!.ms;
+
+  /** Which engine plays a given seat. In play mode every engine seat is the
+   *  chosen opponent; in watch mode the ladder sits down in order. */
+  const engineAt = useCallback(
+    (seat: number) => (mode === "watch" ? WATCH_LADDER[seat % WATCH_LADDER.length] : engine),
+    [mode, engine],
+  );
 
   const push = useCallback((entries: { text: React.ReactNode; cls: string }[]) => {
     if (!entries.length) return;
@@ -82,15 +115,21 @@ export default function Game() {
 
   const start = useCallback(
     (nSeats: number, seed?: number) => {
-      const humanSeat = nSeats - 1; // the human takes the near seat
+      // The human takes the near seat; in watch mode, nobody does.
+      const humanSeat = mode === "play" ? nSeats - 1 : -1;
       const names = Array.from({ length: nSeats }, (_, i) =>
-        i === humanSeat ? "You" : SHIP_NAMES[i % SHIP_NAMES.length],
+        i === humanSeat
+          ? "You"
+          : mode === "watch"
+            ? ENGINES.find((e) => e.id === WATCH_LADDER[i % WATCH_LADDER.length])!.name
+            : SHIP_NAMES[i % SHIP_NAMES.length],
       );
       const g = deal({ seats: nSeats, names, humanSeat, seed });
       setGame(g);
-      setTarget(chooseTarget(g, humanSeat));
+      setTarget(humanSeat >= 0 ? chooseTarget(g, humanSeat) : 0);
       setArmed(false);
       setCoach(false);
+      setHitSeat(-1);
       setTold(blank);
       lineId.current = 0;
       setLines([
@@ -106,16 +145,17 @@ export default function Game() {
         },
       ]);
     },
-    [],
+    [mode],
   );
 
   // Dealt on the client, never during the static render, so the prerendered
   // HTML and the first paint cannot disagree about a shuffled deck.
   useEffect(() => {
     start(seats);
-  }, [seats, engine, start]);
+  }, [seats, engine, mode, start]);
 
   useEffect(() => {
+    setCanFullscreen(!!document.documentElement.requestFullscreen);
     try {
       const raw = window.localStorage.getItem(RECORD_KEY);
       if (raw) setRecords(JSON.parse(raw) as Tallies);
@@ -135,9 +175,15 @@ export default function Game() {
       setGame(next);
       setArmed(false);
       setCoach(false);
+      // Show the blow landing: flash the seat that just lost health or a bank.
+      if (event.kind === "attack" && event.broke) {
+        setHitSeat(event.target);
+        window.clearTimeout(hitTimer.current);
+        hitTimer.current = window.setTimeout(() => setHitSeat(-1), 1100);
+      }
       if (!next.over) {
         const human = next.ships.findIndex((s) => s.human);
-        if (next.current === human) {
+        if (human >= 0 && next.current === human) {
           setTarget((t) =>
             t !== human && !next.ships[t].out ? t : chooseTarget(next, human),
           );
@@ -148,27 +194,31 @@ export default function Game() {
     [push],
   );
 
-  // The engines' turns, one every THINKING_MS so a move can be read.
+  // The engines' turns. Each one thinks for paceMs before moving, and the
+  // previous move's cards stay on the table for the whole of that think --
+  // which is what makes a string of engine turns readable move by move.
   useEffect(() => {
     if (!game || game.over) return;
     if (game.ships[game.current].human) return;
     setBusy(true);
     const id = window.setTimeout(() => {
       setBusy(false);
-      const d = decide(game, engine, rng);
+      const d = decide(game, engineAt(game.current), rng);
       applyMove(game, d.action, d.target);
-    }, THINKING_MS);
+    }, paceMs);
     return () => {
       window.clearTimeout(id);
       setBusy(false);
     };
-  }, [game, engine, rng, applyMove]);
+  }, [game, engineAt, paceMs, rng, applyMove]);
 
-  // The result, written down once per finished game.
+  // The result, written down once per finished game. Watch games are the
+  // engines' business, not the record's.
   const settled = useRef<GameState | null>(null);
   useEffect(() => {
     if (!game || !game.over || settled.current === game) return;
     settled.current = game;
+    if (mode !== "play") return;
     const won = winner(game) >= 0 && game.ships[winner(game)].human;
     setRecords((old) => {
       const prev = old[engine] ?? { won: 0, lost: 0 };
@@ -183,12 +233,12 @@ export default function Game() {
       }
       return next;
     });
-  }, [game, engine]);
+  }, [game, engine, mode]);
 
   /* ------------------------------------------------------------- the human */
 
   const human = game ? game.ships.findIndex((s) => s.human) : -1;
-  const myTurn = !!game && !game.over && !busy && game.current === human;
+  const myTurn = !!game && !game.over && !busy && human >= 0 && game.current === human;
   const legal = useMemo(
     () => (game && myTurn ? legalActions(game, human, target) : null),
     [game, myTurn, human, target],
@@ -202,9 +252,13 @@ export default function Game() {
   const advice = useMemo(() => {
     if (!game || !myTurn || !coach) return null;
     // The ace is always the one asked, whoever you are actually playing.
-    const d = decide(game, "ace", rng);
-    return d;
+    return decide(game, "ace", rng);
   }, [game, myTurn, coach, rng]);
+
+  const fullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void document.documentElement.requestFullscreen();
+  };
 
   if (!game) {
     return (
@@ -218,11 +272,12 @@ export default function Game() {
     );
   }
 
-  const me = game.ships[human];
+  const me = human >= 0 ? game.ships[human] : null;
   const foe = game.ships[target];
   const dry = !canDraw(game);
   const record = records[engine] ?? { won: 0, lost: 0 };
   const engineName = ENGINES.find((e) => e.id === engine)!.name;
+  const watching = mode === "watch";
 
   return (
     <div className="room">
@@ -231,6 +286,17 @@ export default function Game() {
       <div className="topbar">
         <h1>Spaceships</h1>
         <div className="set">
+          <span className="label" id="modeLabel">
+            Table
+          </span>
+          <select
+            aria-labelledby="modeLabel"
+            value={mode}
+            onChange={(e) => setMode(e.target.value as Mode)}
+          >
+            <option value="play">Play</option>
+            <option value="watch">Watch</option>
+          </select>
           <span className="label" id="seatsLabel">
             Players
           </span>
@@ -243,17 +309,35 @@ export default function Game() {
             <option value={3}>3</option>
             <option value={4}>4</option>
           </select>
-          <span className="label" id="engineLabel">
-            Opponent
+          {!watching && (
+            <>
+              <span className="label" id="engineLabel">
+                Opponent
+              </span>
+              <select
+                aria-labelledby="engineLabel"
+                value={engine}
+                onChange={(e) => setEngine(e.target.value as EngineId)}
+              >
+                {ENGINES.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          <span className="label" id="paceLabel">
+            Pace
           </span>
           <select
-            aria-labelledby="engineLabel"
-            value={engine}
-            onChange={(e) => setEngine(e.target.value as EngineId)}
+            aria-labelledby="paceLabel"
+            value={pace}
+            onChange={(e) => setPace(e.target.value as PaceId)}
           >
-            {ENGINES.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
+            {PACES.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
             ))}
           </select>
@@ -261,9 +345,12 @@ export default function Game() {
             Rules
           </button>
           <button onClick={() => start(seats)}>Deal again</button>
-          <span className="record">
-            vs {engineName} <b>{record.won}</b>&ndash;<s>{record.lost}</s>
-          </span>
+          {canFullscreen && <button onClick={fullscreen}>Full screen</button>}
+          {!watching && (
+            <span className="record">
+              vs {engineName} <b>{record.won}</b>&ndash;<s>{record.lost}</s>
+            </span>
+          )}
         </div>
       </div>
 
@@ -271,8 +358,8 @@ export default function Game() {
 
       {game.over && (
         <section className="over">
-          <span className={"msg" + (winner(game) === human ? "" : " lost")}>
-            {winner(game) === human
+          <span className={"msg" + (!watching && winner(game) !== human ? " lost" : "")}>
+            {!watching && winner(game) === human
               ? "Last ship flying. You win."
               : `${winner(game) >= 0 ? game.ships[winner(game)].name : "Nobody"} takes it.`}
           </span>
@@ -287,7 +374,8 @@ export default function Game() {
         <div className="felt" data-seats={game.seats}>
           {game.ships.map((ship, i) => {
             const isTurn = game.current === i && !game.over;
-            const targeted = target === i && !ship.human && !ship.out && !game.over;
+            const targeted =
+              !watching && target === i && !ship.human && !ship.out && !game.over;
             const pickable = !ship.human && !ship.out && myTurn;
             return (
               <div
@@ -297,7 +385,8 @@ export default function Game() {
                   (isTurn ? " turn" : "") +
                   (targeted ? " targeted" : "") +
                   (pickable ? " pickable" : "") +
-                  (ship.out ? " out" : "")
+                  (ship.out ? " out" : "") +
+                  (hitSeat === i ? " hit" : "")
                 }
                 tabIndex={pickable ? 0 : undefined}
                 role={pickable ? "button" : undefined}
@@ -319,41 +408,46 @@ export default function Game() {
                   <span className={"hp num" + (ship.health < ship.startHealth ? " hurt" : "")}>
                     {Math.max(0, ship.health)}
                   </span>
-                  {!ship.human && <span className="engine">{engineName}</span>}
+                  {!ship.human && !watching && <span className="engine">{engineName}</span>}
                   {ship.out ? (
                     <span className="tag gone">Out</span>
                   ) : isTurn ? (
-                    <span className="tag go">{ship.human ? "Your turn" : "Playing"}</span>
+                    <span className="tag go">
+                      {ship.human ? "Your turn" : busy && game.current === i ? "Thinking…" : "Playing"}
+                    </span>
                   ) : null}
                   {targeted && <span className="tag aim">Target</span>}
                 </div>
-                <div className="rows">
-                  <div className="grp">
-                    <span className="label">Health</span>
-                    <div className="cards">
-                      {ship.healthCards.map((v, k) => (
-                        <CardFace key={k} value={v} rot={tilt(i * 7 + k)} />
-                      ))}
-                    </div>
+
+                {/* The tableau reads by placement alone: the shield sits above
+                    the health cards, charges stay face down beside them. */}
+                <div className="tableau">
+                  <div className="shieldrow">
+                    {ship.shield > 0 ? (
+                      <CardFace value={ship.shield} rot={tilt(i * 13 + ship.shield)} />
+                    ) : (
+                      <div className="slot-empty" />
+                    )}
                   </div>
-                  <div className="grp">
-                    <span className="label">Shield {ship.shield || "—"}</span>
-                    <div className="cards">
-                      {ship.shield > 0 ? (
-                        <CardFace value={ship.shield} rot={tilt(i * 13 + ship.shield)} land />
-                      ) : (
-                        <div className="slot-empty" />
-                      )}
+                  <div className="rows">
+                    <div className="grp">
+                      <div className="cards">
+                        {ship.healthCards.map((v, k) => (
+                          <CardFace key={k} value={v} rot={tilt(i * 7 + k)} />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div className="grp">
-                    <span className="label">Charges {ship.bank.length}</span>
-                    <div className="cards">
-                      {ship.bank.length ? (
-                        ship.bank.map((_, k) => <CardBack key={k} rot={tilt(i * 29 + k)} />)
-                      ) : (
-                        <span className="label">none</span>
-                      )}
+                    <div className="grp charges">
+                      <div className="cards">
+                        {ship.bank.map((_, k) => (
+                          <CardBack key={k} rot={tilt(i * 29 + k)} />
+                        ))}
+                      </div>
+                      <span className="label num">
+                        {ship.bank.length
+                          ? `${ship.bank.length} charge${ship.bank.length > 1 ? "s" : ""}`
+                          : "no charges"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -443,12 +537,20 @@ export default function Game() {
       <section className="controls">
         {game.over ? (
           <span className="hint">Hand over.</span>
+        ) : watching ? (
+          <span className="hint">
+            {game.ships
+              .filter((s) => !s.out)
+              .map((s) => s.name)
+              .join(" against ")}{" "}
+            — every seat sees only the public table. Deal again to restart.
+          </span>
         ) : !myTurn ? (
           <span className="hint">{game.ships[game.current].name} is playing&hellip;</span>
         ) : armed ? (
           <>
             <button className="commit" onClick={() => act(CHARGE_ATTACK)}>
-              Say &ldquo;charge attack&rdquo; on {foe.name} &mdash; all {me.bank.length}
+              Say &ldquo;charge attack&rdquo; on {foe.name} &mdash; all {me!.bank.length}
             </button>
             <button onClick={() => setArmed(false)}>Back</button>
             <span className="hint">
@@ -458,8 +560,8 @@ export default function Game() {
           </>
         ) : dry ? (
           <>
-            <button onClick={() => act(me.bank.length ? CHARGE_ATTACK : -1)}>
-              {me.bank.length ? `Forced fire on ${foe.name} — all ${me.bank.length}` : "Pass"}
+            <button onClick={() => act(me!.bank.length ? CHARGE_ATTACK : -1)}>
+              {me!.bank.length ? `Forced fire on ${foe.name} — all ${me!.bank.length}` : "Pass"}
             </button>
             <span className="hint">Nothing left to draw, so you fire what you hold.</span>
           </>
@@ -468,11 +570,8 @@ export default function Game() {
             <button disabled={!legal?.[ATTACK]} onClick={() => act(ATTACK)}>
               Attack {foe.name}
             </button>
-            <button
-              disabled={!legal?.[CHARGE_ATTACK]}
-              onClick={() => setArmed(true)}
-            >
-              Charge attack{me.bank.length ? ` (${me.bank.length})` : ""}
+            <button disabled={!legal?.[CHARGE_ATTACK]} onClick={() => setArmed(true)}>
+              Charge attack{me!.bank.length ? ` (${me!.bank.length})` : ""}
             </button>
             <button disabled={!legal?.[CHARGE]} onClick={() => act(CHARGE)}>
               Charge
@@ -627,8 +726,8 @@ function HowTo() {
     <section className="howto">
       <ul>
         <li>
-          <b>Orientation is the notation.</b> Health cards stand upright, the shield lies
-          on its side. Health itself lives on the paper, not the table.
+          <b>Placement is the notation.</b> The shield sits above the health cards;
+          nothing is rotated or marked. Health itself lives on the paper, not the table.
         </li>
         <li>
           <b>The shield is never used up.</b> It blocks its own value on every attack,
@@ -656,7 +755,8 @@ function HowTo() {
       </ul>
       <p>
         The opponents see exactly what you see: healths, shields, charge counts, and the
-        piles. No one can read a face-down card.
+        piles. No one can read a face-down card. Switch the table to <em>Watch</em> to
+        sit back and let the engines play each other.
       </p>
     </section>
   );
