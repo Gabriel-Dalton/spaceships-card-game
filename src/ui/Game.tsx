@@ -69,6 +69,22 @@ interface Line {
   cls: string;
 }
 
+/**
+ * The moment worth interrupting for.
+ *
+ * `died` fires the instant your health reaches nothing, which at a big table
+ * is not the same as the end of the game -- the others play on without you,
+ * and being told so is the whole point.
+ */
+interface Outcome {
+  kind: "died" | "won" | "over";
+  /** Who did it and with what, when there is a blow to describe. */
+  blow: string | null;
+  turns: number;
+  /** True when the table is still playing after you have gone. */
+  playingOn: boolean;
+}
+
 const blank: Told = { played: [], said: null, lines: [] };
 
 export default function Game() {
@@ -87,9 +103,13 @@ export default function Game() {
   const [records, setRecords] = useState<Tallies>({});
   /** The seat a breakthrough just landed on, flashed and cleared. */
   const [hitSeat, setHitSeat] = useState(-1);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const lineId = useRef(0);
   const hitTimer = useRef(0);
+  const dialog = useRef<HTMLDialogElement>(null);
+  /** The outcome already written into the record, so it is written once. */
+  const settled = useRef<Outcome | null>(null);
   // One stream for the cadet's coin flips. Created lazily so the server-side
   // render and the first client render agree.
   const rng = useRef(makeRng(1)).current;
@@ -130,6 +150,7 @@ export default function Game() {
       setArmed(false);
       setCoach(false);
       setHitSeat(-1);
+      setOutcome(null);
       setTold(blank);
       lineId.current = 0;
       setLines([
@@ -181,6 +202,35 @@ export default function Game() {
         window.clearTimeout(hitTimer.current);
         hitTimer.current = window.setTimeout(() => setHitSeat(-1), 1100);
       }
+      // Being destroyed is not the same event as the game ending: at a big
+      // table the others carry on without you, and that is worth saying out
+      // loud rather than leaving you to notice the buttons have gone.
+      const seat = next.ships.findIndex((s) => s.human);
+      const justDied = seat >= 0 && !g.ships[seat].out && next.ships[seat].out;
+      const blow =
+        event.kind === "attack" && event.broke && event.damage > 0
+          ? `${g.ships[event.actor].name} ${
+              event.declared ? "declared a charge attack" : "attacked"
+            } for ${event.total}, through ${
+              event.target === seat ? "your" : `${g.ships[event.target].name}’s`
+            } ${rankName(event.shield)} for ${event.damage}.`
+          : null;
+
+      const alreadyGone = seat >= 0 && g.ships[seat].out;
+      if (justDied) {
+        setOutcome({ kind: "died", blow, turns: next.turns, playingOn: !next.over });
+      } else if (next.over && !alreadyGone) {
+        // Not reached once you are out: your game ended when you did, and the
+        // survivors finishing up must not overwrite that or record it twice.
+        const champion = winner(next);
+        setOutcome({
+          kind: champion >= 0 && champion === seat ? "won" : "over",
+          blow,
+          turns: next.turns,
+          playingOn: false,
+        });
+      }
+
       if (!next.over) {
         const human = next.ships.findIndex((s) => s.human);
         if (human >= 0 && next.current === human) {
@@ -193,6 +243,14 @@ export default function Game() {
     },
     [push],
   );
+
+  // A native <dialog> so the browser handles the focus trap and Escape for us.
+  useEffect(() => {
+    const el = dialog.current;
+    if (!el) return;
+    if (outcome && !el.open) el.showModal();
+    if (!outcome && el.open) el.close();
+  }, [outcome]);
 
   // The engines' turns. Each one thinks for paceMs before moving, and the
   // previous move's cards stay on the table for the whole of that think --
@@ -212,14 +270,13 @@ export default function Game() {
     };
   }, [game, engineAt, paceMs, rng, applyMove]);
 
-  // The result, written down once per finished game. Watch games are the
-  // engines' business, not the record's.
-  const settled = useRef<GameState | null>(null);
+  // The result, written down once per deal, at the moment it is decided --
+  // which for a loss is when you are destroyed, not when the survivors finish
+  // arguing about it. Watch games are the engines' business, not the record's.
   useEffect(() => {
-    if (!game || !game.over || settled.current === game) return;
-    settled.current = game;
-    if (mode !== "play") return;
-    const won = winner(game) >= 0 && game.ships[winner(game)].human;
+    if (!outcome || mode !== "play" || settled.current === outcome) return;
+    settled.current = outcome;
+    const won = outcome.kind === "won";
     setRecords((old) => {
       const prev = old[engine] ?? { won: 0, lost: 0 };
       const next: Tallies = {
@@ -233,7 +290,7 @@ export default function Game() {
       }
       return next;
     });
-  }, [game, engine, mode]);
+  }, [outcome, engine, mode]);
 
   /* ------------------------------------------------------------- the human */
 
@@ -353,6 +410,38 @@ export default function Game() {
           )}
         </div>
       </div>
+
+      <dialog className="verdict-box" ref={dialog} onClose={() => setOutcome(null)}>
+        {outcome && (
+          <>
+            <p className={"headline" + (outcome.kind === "won" ? " good" : " bad")}>
+              {outcome.kind === "died"
+                ? "Too bad — you died."
+                : outcome.kind === "won"
+                  ? "Last ship flying. You win."
+                  : `${winner(game) >= 0 ? game.ships[winner(game)].name : "Nobody"} takes it.`}
+            </p>
+            {outcome.blow && <p className="blow">{outcome.blow}</p>}
+            <p className="tally">
+              {outcome.turns} turns.{" "}
+              {outcome.playingOn
+                ? "The others play on without you."
+                : mode === "play"
+                  ? `That is ${record.won}–${record.lost} against the ${engineName}.`
+                  : "Deal again for another."}
+            </p>
+            <div className="set">
+              <button className="commit" autoFocus onClick={() => start(seats)}>
+                Deal again
+              </button>
+              <button onClick={() => start(seats, game.seed)}>Replay this deal</button>
+              <button onClick={() => setOutcome(null)}>
+                {outcome.playingOn ? "Watch it out" : "Look at the table"}
+              </button>
+            </div>
+          </>
+        )}
+      </dialog>
 
       {showRules && <HowTo />}
 
@@ -537,6 +626,16 @@ export default function Game() {
       <section className="controls">
         {game.over ? (
           <span className="hint">Hand over.</span>
+        ) : human >= 0 && game.ships[human].out ? (
+          <>
+            <button className="commit" onClick={() => start(seats)}>
+              Deal again
+            </button>
+            <span className="hint">
+              You are out. {game.ships.filter((s) => !s.out).length} still flying —
+              the table plays on.
+            </span>
+          </>
         ) : watching ? (
           <span className="hint">
             {game.ships
