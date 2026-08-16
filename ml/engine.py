@@ -33,11 +33,59 @@ exactly equivalent to shuffling and taking the top card, and it vectorises.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 import numpy as np
 
 RANKS = np.arange(1, 14, dtype=np.int32)      # Ace = 1 .. King = 13
 FULL_DECK = np.full(13, 4, dtype=np.int32)    # four of every rank, no jokers
 N_ACTIONS = 5
+
+
+@dataclass(frozen=True)
+class RuleSet:
+    """Candidate rules, all off by default.
+
+    The default instance is RULES.md exactly as written, so an engine built
+    without arguments is bit-for-bit the one the trained checkpoints were
+    fitted against and the one the TypeScript port is tested against. Turning
+    a field on is the *only* way to get a different game, which is what makes
+    ``ml/proposals.py`` a controlled experiment rather than a rewrite.
+
+    See PROPOSALS.md for the argument behind each one.
+    """
+
+    #: On a breakthrough, take this many of the defender's destroyed charges
+    #: into your own bank -- still face down, still unread by anyone.
+    salvage: int = 0
+
+    #: A blocked attack does not discard the card you drew; the defender takes
+    #: it as a charge. Your shot bounces off their shield and they bank it.
+    ricochet: bool = False
+
+    #: Cards banked by one charge action. Raising it buys the same firepower
+    #: in fewer turns, which is aimed squarely at how much of the game is
+    #: spent doing nothing but banking.
+    charge_draw: int = 1
+
+    #: Require an attack to *exceed* the shield rather than merely equal it,
+    #: which removes the free pure-disarm shot at an exact match.
+    strict_breakthrough: bool = False
+
+    #: Deal four cards and choose which one is the shield; the other three are
+    #: health. Same four cards as the standard deal, one decision added.
+    deal_four: bool = False
+
+    #: How each seat makes that choice, when ``deal_four`` is on:
+    #: "high" (best shield), "low" (keep the health), "mid" (closest to 7).
+    #: Short tuples repeat, so ("high",) means everybody picks high.
+    shield_pick: tuple = field(default=("high",))
+
+    def pick_for(self, seat):
+        return self.shield_pick[seat % len(self.shield_pick)]
+
+
+STANDARD = RuleSet()
 
 CHARGE, SWAP_SELF, ATTACK, CHARGE_ATTACK, SWAP_TARGET = range(N_ACTIONS)
 
@@ -70,12 +118,13 @@ class Spaceships:
     ``active`` and never stepped again.
     """
 
-    def __init__(self, n_games, n_players=2, rng=None, max_turns=400):
+    def __init__(self, n_games, n_players=2, rng=None, max_turns=400, rules=STANDARD):
         if n_players < 2 or n_players > 6:
             raise ValueError("Spaceships seats two to six players")
         self.n_games = int(n_games)
         self.n_players = int(n_players)
         self.max_turns = int(max_turns)
+        self.rules = rules
         self.rng = rng if rng is not None else np.random.default_rng()
         self.reset()
 
@@ -95,9 +144,23 @@ class Spaceships:
 
         every = np.arange(B)
         for p in range(P):
-            for _ in range(3):                       # three health cards
-                self.health[:, p] += self._draw(every)
-            self.shield[:, p] = self._draw(every)    # one shield
+            if self.rules.deal_four:
+                # Four cards, one of which becomes the shield -- the same four
+                # the standard deal uses, so the deck budget does not move.
+                cards = np.stack([self._draw(every) for _ in range(4)], axis=1)
+                pick = self.rules.pick_for(p)
+                if pick == "high":
+                    idx = np.argmax(cards, axis=1)
+                elif pick == "low":
+                    idx = np.argmin(cards, axis=1)
+                else:                                # closest to the average card
+                    idx = np.argmin(np.abs(cards - 7), axis=1)
+                self.shield[:, p] = cards[every, idx]
+                self.health[:, p] = cards.sum(1) - self.shield[:, p]
+            else:
+                for _ in range(3):                       # three health cards
+                    self.health[:, p] += self._draw(every)
+                self.shield[:, p] = self._draw(every)    # one shield
 
         # Lowest starting health total goes first; ties on shield, then a deal.
         key = (self.health.astype(np.float64) * 100.0
@@ -313,6 +376,14 @@ class Spaceships:
             r = rows[m]
             drawn = self._draw(r)
             np.add.at(self.charges, (r, me[m], drawn - 1), 1)
+            # Extra cards under a raised charge_draw, each one still a blind
+            # draw and still subject to there being anything left to draw.
+            for _ in range(self.rules.charge_draw - 1):
+                more = self.can_draw(r)
+                if not more.any():
+                    break
+                extra = self._draw(r[more])
+                np.add.at(self.charges, (r[more], me[m][more], extra - 1), 1)
 
         # --- swap a shield, mine or theirs: the old one is discarded, the new
         #     one comes off the deck blind and you are stuck with it
@@ -338,22 +409,55 @@ class Spaceships:
             bank = (self.charges[r, mm] * RANKS).sum(1)
             attack = drawn + np.where(declared, bank, 0)
             t_shield = self.shield[r, tt]
-            through = attack >= t_shield
+            through = (attack > t_shield if self.rules.strict_breakthrough
+                       else attack >= t_shield)
+
+            # [len(r), 13] of cards pulled out of a wrecked bank, held aside so
+            # they survive the attacker's own bank being spent below.
+            salvaged = np.zeros((len(r), 13), dtype=np.int32)
 
             if through.any():
                 hr, ht = r[through], tt[through]
+                pos = np.flatnonzero(through)
                 # Equal counts as breaking through: no damage, but the bank goes.
                 self.health[hr, ht] -= (attack[through] - t_shield[through])
+                for _ in range(self.rules.salvage):
+                    # A blind pick out of the wreck: face down going in, face
+                    # down coming out, so nobody learns what they took.
+                    counts = self.charges[hr, ht]
+                    total = counts.sum(1)
+                    live = np.flatnonzero(total > 0)
+                    if not len(live):
+                        break
+                    cum = np.cumsum(counts[live], axis=1)
+                    u = self.rng.random(len(live)) * total[live]
+                    idx = np.minimum((cum <= u[:, None]).sum(1), 12)
+                    self.charges[hr[live], ht[live], idx] -= 1
+                    salvaged[pos[live], idx] += 1
                 self.discard[hr] += self.charges[hr, ht]
                 self.charges[hr, ht] = 0
 
             if can.any():
-                np.add.at(self.discard, (r[can], drawn[can] - 1), 1)
+                if self.rules.ricochet:
+                    # A blocked shot is absorbed rather than spent: the card
+                    # goes face down in front of the defender.
+                    bounced = can & ~through
+                    spent = can & through
+                    if bounced.any():
+                        np.add.at(self.charges,
+                                  (r[bounced], tt[bounced], drawn[bounced] - 1), 1)
+                    if spent.any():
+                        np.add.at(self.discard, (r[spent], drawn[spent] - 1), 1)
+                else:
+                    np.add.at(self.discard, (r[can], drawn[can] - 1), 1)
 
             if declared.any():
                 dr, dm = r[declared], mm[declared]
                 self.discard[dr] += self.charges[dr, dm]
                 self.charges[dr, dm] = 0
+
+            if salvaged.any():
+                self.charges[r, mm] += salvaged
 
         self._resolve_deaths(rows)
         self._advance(rows)

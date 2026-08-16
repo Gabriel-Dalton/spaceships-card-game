@@ -44,6 +44,7 @@ The full rules, with the reasoning behind each one, are in **[RULES.md](RULES.md
 
 ```
 RULES.md            the rules, and the design notes arguing for them
+PROPOSALS.md        candidate new rules, measured against the ones we have
 src/                the playable web app: game engine, opponents, table UI
 public/             the home-screen icons and the web manifest
 tests/              the rules tests, and parity tests against the ML engine
@@ -164,7 +165,8 @@ trainer that improves a policy against a league of its own past selves.
 
 ```
 pip install numpy
-python3 -m ml.test_engine                                # 16 rules tests
+python3 -m ml.test_engine                                # 23 rules tests
+python3 -m ml.proposals                                  # candidate rules, measured
 python3 -m ml.train --generations 400                    # train
 python3 -m ml.arena --checkpoint ml/runs/duel.json --profile
 ```
@@ -201,13 +203,14 @@ the model rather than just the play.
 
 ## Roadmap
 
-- **Rule design as a collaboration.** Teach the rules to a model that can also
-  simulate them, and ask it to propose new rules that make sense — variants
-  that keep the game going, deepen the choices, or close the failure modes the
-  design notes worry about (the passive table above all). The tooling for this
-  already exists in the repo: a candidate rule goes into `ml/engine.py`, the
-  self-play trainer measures what it does to the game's rhythm, and the ones
-  that survive the arithmetic graduate to RULES.md and the app.
+- **Rule design as a collaboration.** Started, in
+  **[PROPOSALS.md](PROPOSALS.md)**: six candidate rules, each implemented in
+  `ml/engine.py` behind a flag that is off by default and run over 20,000
+  games against the standard rules (`python3 -m ml.proposals`). Two survive —
+  *salvage* and *charge draws two* — and one of the rejections argues for
+  keeping an existing rule exactly as it is. Nothing there is adopted yet; the
+  next step for the survivors is a self-play run under each, and then human
+  playtesting.
 - **Human results as evidence.** The web app records your results against each
   engine; enough games against the Ace is playtest data the design notes can
   actually use.
