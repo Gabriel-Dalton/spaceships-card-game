@@ -182,6 +182,38 @@ shield has to be either charged through or swapped away. The cost is a turn spen
 doing nothing, and the risk is that anyone who breaks through your shield first
 wipes the whole stockpile.
 
+### Running out of cards
+
+Every action draws exactly one card, so the deck drains steadily. **When the deck
+runs out, shuffle the discard pile and it becomes the new deck.** Play continues;
+the deck is never a way for the game to end.
+
+The discard pile is everything that has been used and finished with: attack cards
+once resolved, charges that have been spent or eliminated, and shields that have
+been swapped away. Three things are *not* in it and never reshuffle:
+
+- **health cards**, which stay in front of their owner all game as a record,
+- **shields currently in play**, and
+- **live charges**, still face down in front of a player.
+
+So the cards actually circulating are `52 - 4 x players`, and every charge banked
+takes one more of them out of circulation until it is spent.
+
+#### If there is nothing to draw at all **[inferred]**
+
+Because live charges never return, a table where everybody banks and nobody fires
+can drain the deck *and* the discard at the same time — and since all three
+actions require a draw, nobody could legally do anything. It takes a
+completely passive table to get there (it did not occur once in 20,000 simulated
+games at any player count), but the rules should not simply stop.
+
+**If you cannot draw, you must fire.** Attack with your entire bank and no drawn
+card — the charges alone are your attack value. If you have no charges, pass.
+
+The standoff then breaks itself: forced fire pushes banks into the discard, the
+discard reshuffles, and play resumes. It also makes banking-forever
+self-defeating rather than game-ending, which is the right punishment for it.
+
 ---
 
 ## Design notes
@@ -215,35 +247,37 @@ worth 7 on average and the expected value of a stockpile is still 7 per card.
 What it changes is that you can never wait for a *good* bank, only a *big* one.
 Charge counts, not card values, are the entire language of the game.
 
-### The deck is a turn budget, and it decides the player count
+### What the reshuffle rule buys
 
-Every action in the game draws exactly one card — attack, swap and charge alike.
-Setup takes four cards a player. So the number of turns a game can contain is
-fixed before anyone acts:
+Without it, the deck is a hard turn budget. Every action draws one card and setup
+takes four per player, so a game can only contain `52 - 4 x players` turns — and
+that is not enough for a full table. Simulated to exhaustion, a five-player game
+ran out of cards 83% of the time and a six-player game 99.7%, which makes the deck
+the primary win condition and the game a countdown rather than a fight.
 
-```
-turns available = 52 - 4 x players
-```
+Reshuffling removes that ceiling entirely, and the cost is close to nothing:
 
-| players | setup | turns in the deck | turns each | median game | ran the deck dry |
-| --- | --- | --- | --- | --- | --- |
-| 2 | 8 | 44 | 22 | 13 | **0.0%** |
-| 3 | 12 | 40 | 13 | 22 | 1.5% |
-| 4 | 16 | 36 | 9 | 31 | 28.4% |
-| 5 | 20 | 32 | 6 | 33 | 83.1% |
-| 6 | 24 | 28 | 4 | 29 | 99.7% |
+| players | median game | 90th pct | reshuffles per game | deadlocked |
+| --- | --- | --- | --- | --- |
+| 2 | 13 turns | 21 | 0.00 | 0% |
+| 3 | 22 | 32 | 0.01 | 0% |
+| 4 | 31 | 44 | 0.28 | 0% |
+| 5 | 42 | 58 | 0.91 | 0% |
+| 6 | 54 | 73 | 1.62 | 0% |
 
 *(20,000 simulated games each, sensible heuristic play)*
 
-**A duel never runs out.** Not once in 20,000 games — a two-player game uses a
-median of 13 turns against a budget of 44, and even the long tail stays well
-inside it. Deck exhaustion is a rule a duel will essentially never invoke.
+**A duel reshuffles essentially never** — 13 turns used against 44 available — so
+at two players this is a rule that exists and never fires. It earns its keep at
+five and six, where it costs one or two shuffles and converts a countdown into a
+real game. Note also that turns-per-player barely moves as the table grows, from
+about 6 each in a duel to 9 each at six players.
 
-Above three players it stops being a corner case and becomes the way most games
-end. At five and six, the deck is the primary win condition, which is not a game
-so much as a countdown. **The physical deck therefore caps this at two or three
-players**, four with a reshuffle rule and the understanding that the shuffle will
-be reached routinely.
+So **the deck no longer caps the player count.** What remains against a big table
+is strategic rather than physical: the first-turn compensation reasoning below is
+argued for a duel, target selection introduces kingmaking, and the disarm hazard
+that keeps banking honest may thin out when attention is split several ways. Those
+are playtest questions, not arithmetic ones.
 
 ### Why the binding declaration costs almost nothing
 
@@ -417,14 +451,22 @@ in is what the bank is for.
 3. **Swap commitment.** When you swap a shield, is the replacement drawn blind
    from the deck and forced (you're stuck with whatever comes up), or can you
    look first? Blind is assumed above.
-4. **Deck exhaustion.** Reshuffle the discards, or does the game end? Recommend
-   reshuffle. A duel reached it in 0 of 20,000 simulated games, so at two players
-   the rule costs nothing and never fires; it only starts mattering at four.
+4. **Deck exhaustion.** ~~Reshuffle the discards, or does the game end?~~
+   **Settled: reshuffle.** See *Running out of cards*.
 5. **Player count.** Written as multiplayer, which the swap-someone-else's-shield
-   rule implies. The deck answers this on its own — see *The deck is a turn
-   budget*. Two or three players fits comfortably, four needs the reshuffle, and
-   five or six turns the deck into a countdown timer. Recommend **2–3, duel
-   preferred**, which is also where the first-turn compensation maths holds.
+   rule implies. The deck no longer decides this — with the reshuffle in place
+   every count from 2 to 6 finishes cleanly. What is left is strategic: the
+   first-turn compensation argument below is made for a duel, and a big table may
+   not disarm often enough to keep banking honest. Needs playtesting rather than
+   a ruling.
+6. **Forced fire on an empty table.** The backstop in *Running out of cards* is
+   my invention, not a ruling — confirm or replace it. It only ever triggers on a
+   table where nobody is attacking at all.
+7. **Eliminated charges.** When a breakthrough wipes a defender's bank, are those
+   cards revealed on the way to the discard, or binned face down still unseen?
+   Revealing costs nothing strategically — they are gone either way — and gives
+   the attacker the satisfaction of seeing what they destroyed. Face down is more
+   consistent with never learning what a charge was worth. Assumed revealed.
 
 ### Settled since the last pass
 
@@ -433,6 +475,9 @@ in is what the bank is for.
   expected damage from three charges up.
 - **Declaration happens before the draw**, so the fire-or-hold decision is read
   off the table rather than off a card you just flipped.
+- **The deck reshuffles from the discards** when it runs out, so the game always
+  ends on health rather than on cards. Never fires in a duel; worth one or two
+  shuffles at five and six players, which is what makes those counts playable.
 
 ### Still needed before a solver can be written
 
@@ -457,3 +502,10 @@ rule:
   composition is common knowledge. A duel ends with a median of 31 of 52 cards
   still unidentified, so counting stays weak and the uniform 1–13 model is a sound
   evaluation function throughout — typical error under 2% early, around 5% late.
+
+The reshuffle simplifies the model rather than complicating it. Because the
+discards come back, the circulating pool is a fixed, known multiset — the 52 minus
+the health cards and the shields currently on the table — so draws are independent
+samples from a distribution that only changes when a shield is swapped. There is
+no cumulative depletion to track across the whole game, only within the current
+pass through the deck.
