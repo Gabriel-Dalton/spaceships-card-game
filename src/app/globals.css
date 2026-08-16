@@ -1,0 +1,323 @@
+/* ------------------------------------------------------------------ tokens
+   A table in a room, seen from above. Card stock and table top are both pale,
+   the way they are in life, so cards separate by shadow rather than by colour.
+   One committed visual world, so every colour is painted explicitly. */
+:root{
+  --room:      #17150F;      /* the room around the table */
+  --room-2:    #221F16;
+  --felt:      #E7E3D7;      /* the table top */
+  --felt-2:    #DAD5C6;
+  --felt-line: #CFC9B7;      /* the seam across it */
+
+  --stock:     #F7F4EC;      /* card stock */
+  --gold:      #A08E52;      /* the printed gold */
+  --gold-lit:  #C3AF6F;
+  --gold-deep: #79693A;
+
+  --ink:       #2B2620;
+  --ink-soft:  #6A6357;
+  --ink-faint: #928B7C;
+
+  --pen:       #24356B;      /* biro on the score sheet */
+  --pen-soft:  #4A5A8C;
+  --paper:     #FBFAF6;
+  --paper-2:   #EFEDE4;
+  --print:     #B9B5AA;
+
+  --danger:    #A8402A;
+
+  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Times New Roman", serif;
+
+  --cw: 48px;                /* card width; height is 1.4x */
+}
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+
+body{
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--room-2) 0%, rgba(23,21,15,0) 60%),
+    var(--room);
+  color:#E7E2D4;
+  font-family: var(--serif);
+  font-size:16px;
+  line-height:1.5;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+.sprite{ position:absolute; width:0; height:0; overflow:hidden; }
+
+.label{
+  font-size:.57rem; text-transform:uppercase; letter-spacing:.18em;
+  color: var(--ink-faint); font-weight:400;
+}
+.num{ font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ shell */
+.room{
+  max-width:1240px; margin:0 auto; padding:18px 18px 32px;
+  display:flex; flex-direction:column; gap:14px;
+}
+.topbar{ display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.topbar h1{
+  margin:0; font-size:1.2rem; font-weight:400;
+  letter-spacing:.3em; text-transform:uppercase; color:#EFEADB;
+}
+.topbar .set{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.topbar .label{ color:#8C846E; }
+
+button, select{
+  font-family: var(--serif); font-size:.68rem;
+  text-transform:uppercase; letter-spacing:.14em;
+  color:#EFEADB; background:#241F14;
+  border:1px solid #3D3624; border-radius:2px;
+  padding:8px 13px; cursor:pointer;
+  transition:border-color .15s, color .15s;
+}
+button:hover:not(:disabled), select:hover{ border-color:var(--gold); color:var(--gold-lit); }
+button:focus-visible, select:focus-visible{ outline:2px solid var(--gold-lit); outline-offset:2px; }
+button:disabled{ opacity:.45; cursor:not-allowed; }
+button.commit{ border-color:#8C3A24; color:#F0C6B6; background:#2C160E; }
+button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
+
+/* the running score against this opponent, kept between sessions */
+.record{
+  font-size:.66rem; letter-spacing:.14em; text-transform:uppercase;
+  color:#8C846E; border-left:1px solid #3D3624; padding-left:12px;
+}
+.record b{ color:var(--gold-lit); font-weight:400; }
+.record s{ color:#9C6250; text-decoration:none; }
+
+/* --------------------------------------------------------------- the table */
+.felt-wrap{ display:grid; grid-template-columns:1fr auto; gap:16px; align-items:start; }
+
+.felt{
+  position:relative;
+  background:linear-gradient(158deg, var(--felt) 0%, var(--felt-2) 100%);
+  border-radius:6px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.55) inset,
+    0 18px 44px rgba(0,0,0,.55),
+    0 2px 6px rgba(0,0,0,.4);
+  padding:16px 14px;
+  min-height:400px;
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  grid-template-rows:auto auto auto;
+  align-content:space-between;
+  justify-items:center;      /* players sit at the table, not across it */
+  gap:8px;
+  color:var(--ink);
+  overflow:hidden;
+}
+/* the seam across the table top, as in the room this was drawn from */
+.felt::after{
+  content:""; position:absolute; top:0; bottom:0; left:50%;
+  width:1px; background:var(--felt-line); pointer-events:none;
+}
+
+.seat{
+  position:relative; z-index:1;
+  border:1px solid transparent; border-radius:4px;
+  padding:7px 9px;
+  display:flex; flex-direction:column; gap:6px;
+  transition:border-color .15s, background .15s;
+  min-width:0;
+}
+.seat.turn{ border-color:var(--gold); background:rgba(160,142,82,.12); }
+.seat.targeted{ border-color:var(--danger); background:rgba(168,64,42,.08); }
+.seat.pickable{ cursor:pointer; }
+.seat.pickable:hover{ border-color:var(--danger); }
+.seat.pickable:focus-visible{ outline:2px solid var(--danger); outline-offset:2px; }
+.seat.out{ opacity:.4; }
+
+.nameline{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.nameline .nm{ font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--ink); }
+.nameline .hp{ font-size:1.45rem; line-height:1; color:var(--ink); }
+.nameline .hp.hurt{ color:var(--danger); }
+.nameline .engine{
+  font-size:.54rem; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ink-faint); font-style:italic;
+}
+.tag{
+  font-size:.54rem; letter-spacing:.15em; text-transform:uppercase;
+  border:1px solid currentColor; border-radius:2px; padding:1px 6px;
+}
+.tag.go{ color:var(--gold-deep); }
+.tag.aim, .tag.gone{ color:var(--danger); }
+
+.rows{ display:flex; gap:13px; align-items:flex-end; flex-wrap:wrap; }
+.grp{ display:flex; flex-direction:column; gap:3px; }
+.grp .cards{ display:flex; align-items:flex-end; }
+.grp .cards .card + .card{ margin-left:-9px; }
+
+/* seat placement, by table size */
+.felt[data-seats="2"] .s0{ grid-area:1 / 2; }
+.felt[data-seats="2"] .s1{ grid-area:3 / 2; }
+.felt[data-seats="3"] .s0{ grid-area:1 / 1; }
+.felt[data-seats="3"] .s1{ grid-area:1 / 3; }
+.felt[data-seats="3"] .s2{ grid-area:3 / 2; }
+.felt[data-seats="4"] .s0{ grid-area:1 / 2; }
+.felt[data-seats="4"] .s1{ grid-area:2 / 1; align-self:center; }
+.felt[data-seats="4"] .s2{ grid-area:2 / 3; align-self:center; }
+.felt[data-seats="4"] .s3{ grid-area:3 / 2; }
+
+.middle{
+  grid-area:2 / 2; position:relative; z-index:1;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:9px; min-height:0;
+}
+.piles{ display:flex; gap:20px; align-items:flex-start; }
+.pile{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+.stack{ position:relative; width:var(--cw); height:calc(var(--cw)*1.4); }
+.stack .card{ position:absolute; inset:0; }
+.slot-empty{ width:var(--cw); height:calc(var(--cw)*1.4); border:1px dashed #C0BAA8; border-radius:4px; }
+.played{ display:flex; gap:3px; align-items:flex-end; min-height:calc(var(--cw)*1.4); flex-wrap:wrap; justify-content:center; }
+.said{ margin:0; font-size:.88rem; color:var(--ink); text-align:center; max-width:36ch; }
+.said .hit{ color:var(--danger); }
+.said .no{ color:var(--ink-soft); }
+.said em{ color:var(--gold-deep); font-style:normal; }
+.said .idle{ color:var(--ink-faint); font-style:italic; }
+
+/* ------------------------------------------------------------------ cards */
+.card{
+  width:var(--cw); height:calc(var(--cw)*1.4);
+  border-radius:3px; background:var(--stock);
+  box-shadow:0 1px 2px rgba(0,0,0,.3), 0 5px 12px rgba(0,0,0,.22);
+  flex:0 0 auto; position:relative; overflow:hidden;
+}
+.card svg{ display:block; width:100%; height:100%; }
+.card.dealt{ animation:drop .22s ease-out both; }
+@keyframes drop{ from{ opacity:0; } to{ opacity:1; } }
+
+/* a shield lies on its side; a rotated card keeps its portrait layout box,
+   so the wrapper carries the landscape footprint explicitly */
+.land{ position:relative; width:calc(var(--cw)*1.4); height:var(--cw); flex:0 0 auto; }
+.land .card{ position:absolute; top:50%; left:50%; }
+
+.face{
+  position:absolute; inset:0;
+  display:grid; grid-template-rows:auto 1fr auto;
+  padding:4px 4px 3px; color:var(--gold-deep);
+}
+.face::before{
+  content:""; position:absolute; inset:2.5px;
+  border:1px solid var(--gold); border-radius:2px; opacity:.5;
+}
+.face .pip{ font-size:calc(var(--cw)*.26); line-height:1; position:relative; }
+.face .pip.bot{ transform:rotate(180deg); }
+.face .mid{ display:grid; place-items:center; position:relative; }
+.face .mid svg{ width:calc(var(--cw)*.36); height:calc(var(--cw)*.36); opacity:.7; }
+
+/* --------------------------------------------------------- the score sheet */
+.sheet{
+  position:relative; width:236px;
+  background:linear-gradient(172deg, var(--paper), var(--paper-2));
+  border-radius:2px;
+  box-shadow:0 14px 34px rgba(0,0,0,.5), 0 2px 5px rgba(0,0,0,.35);
+  padding:15px 14px 13px;
+  transform:rotate(-1.2deg);
+  color:var(--pen);
+}
+.sheet .printed{ display:flex; flex-direction:column; gap:6px; margin-bottom:13px; opacity:.5; }
+.sheet .printed i{
+  display:block; height:20px; border-radius:1px;
+  background:repeating-linear-gradient(var(--print) 0 1.5px, transparent 1.5px 5.5px);
+}
+.sheet .printed i:nth-child(2){ width:88%; }
+.sheet .printed i:nth-child(3){ width:70%; }
+.sheet h2{
+  margin:0 0 6px; font-size:.58rem; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--pen-soft); font-weight:400;
+}
+.col{ display:flex; flex-direction:column; gap:2px; border-top:1px solid #C9C4B4; padding:6px 2px; }
+.col:last-child{ border-bottom:1px solid #C9C4B4; }
+.who{ display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--pen); }
+.who .live{ font-size:1rem; }
+.who .live.dead{ color:var(--danger); text-decoration:line-through; }
+.runs{ display:flex; flex-wrap:wrap; gap:6px; font-size:.8rem; color:var(--pen-soft); }
+.runs span{ display:inline-block; }
+.runs span.old{ text-decoration:line-through; opacity:.7; }
+
+/* ---------------------------------------------------------------- controls */
+.controls{
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+  border:1px solid #322C1E; background:#1D1A11; padding:12px 14px; border-radius:3px;
+}
+.controls .hint{ font-size:.75rem; color:#A79E82; font-style:italic; margin-left:auto; text-align:right; }
+.journal{
+  border:1px solid #322C1E; background:#1D1A11; border-radius:3px;
+  padding:10px 14px; max-height:126px; overflow-y:auto;
+  display:flex; flex-direction:column-reverse; gap:4px; font-size:.81rem;
+}
+.journal p{ margin:0; color:#A79E82; }
+.journal p strong{ color:#EFEADB; font-weight:400; }
+.journal p.dmg strong{ color:#D9714F; }
+.journal p.sys{ color:#7B735C; font-style:italic; }
+
+/* ------------------------------------------------------------ the coach */
+.coach{
+  border:1px solid #3D3624; background:#211D13; border-radius:3px;
+  padding:12px 14px; display:flex; flex-direction:column; gap:8px;
+}
+.coach .head{
+  font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:#8C846E;
+  display:flex; justify-content:space-between; gap:12px; align-items:baseline;
+}
+.coach .verdict{ font-size:.95rem; color:#EFEADB; margin:0; }
+.coach .verdict b{ color:var(--gold-lit); font-weight:400; }
+.coach .why{ font-size:.8rem; color:#A79E82; margin:0; font-style:italic; }
+/* the five action scores, as a bar apiece: the shape of the net's opinion */
+.bars{ display:grid; grid-template-columns:auto 1fr auto; gap:3px 10px; align-items:center; }
+.bars .k{ font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:#8C846E; }
+.bars .k.off{ opacity:.4; text-decoration:line-through; }
+.bars .track{ height:6px; background:#2C2718; border-radius:1px; position:relative; overflow:hidden; }
+.bars .fill{ position:absolute; top:0; bottom:0; background:var(--gold-deep); }
+.bars .fill.best{ background:var(--gold-lit); }
+.bars .v{ font-size:.66rem; color:#6E674F; font-variant-numeric:tabular-nums; }
+
+.over{
+  border:1px solid var(--gold-deep); background:#241F12; border-radius:3px;
+  padding:14px 16px; display:flex; align-items:center; gap:16px;
+  justify-content:space-between; flex-wrap:wrap;
+}
+.over .msg{ font-size:1.05rem; color:#EFEADB; letter-spacing:.05em; }
+.over .msg.lost{ color:#D9714F; }
+.over .set{ display:flex; gap:8px; flex-wrap:wrap; }
+
+.howto ul{ margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:6px; }
+.howto{ border:1px solid #322C1E; background:#1D1A11; border-radius:3px; padding:14px 16px; }
+.howto li{ font-size:.85rem; color:#A79E82; }
+.howto li b{ color:#EFEADB; font-weight:400; }
+.howto p{ font-size:.8rem; color:#7B735C; margin:10px 0 0; }
+.howto a{ color:var(--gold-lit); }
+
+@media (max-width: 920px){
+  .felt-wrap{ grid-template-columns:1fr; }
+  .sheet{ width:auto; transform:none; }
+}
+@media (max-width: 620px){
+  :root{ --cw:38px; }
+  .felt{ padding:9px; min-height:0; }
+  .controls .hint{ margin-left:0; text-align:left; flex-basis:100%; }
+  .record{ border-left:0; padding-left:0; }
+}
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+
+/* ----------------------------------------------------- card back internals */
+.cb-stock{ fill: var(--stock); }
+.cb-gold{ fill: var(--gold); }
+.cb-hair{ fill:none; stroke: var(--stock); stroke-width:1; opacity:.85; }
+.cb-panel{ fill:none; stroke: var(--stock); stroke-width:1.4; }
+.cb-orn{ fill:none; stroke: var(--stock); stroke-width:1.15; stroke-linecap:round; }
+.cb-orn-fill{ fill: var(--stock); stroke:none; }
+.cb-dot{ fill: var(--stock); opacity:.6; }
+.rose-star{ fill: var(--stock); }
+.rose-shade{ fill: var(--gold-deep); opacity:.85; }
+.rose-ring{ fill:none; stroke: var(--stock); stroke-width:1.1; }
+.rose-teeth{ fill:none; stroke: var(--stock); stroke-width:4.6; stroke-dasharray:2.2 3.6; }
+.rose-hub{ fill: var(--gold-deep); stroke: var(--stock); stroke-width:1; }

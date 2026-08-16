@@ -12,10 +12,12 @@ horizontal is shield.**
 
 You are dealt three health cards and one shield. Add the health cards up and
 write the total on paper — that is the only health you will ever have, because
-nothing in this game heals. Your shield is a **permanent threshold**: every
-attack against you for the rest of the game has to clear it, and it is never
-damaged or used up. A King is a fortress; a 3 is a wound you carry until you
-spend a turn swapping it.
+nothing in this game heals. Your shield is a **standing threshold**: every
+attack against you has to clear it, and being attacked never damages or uses
+it up. It is not untouchable, though — a swap replaces it with a blind draw,
+and *anyone* may spend a turn swapping it, you included. A King is a fortress
+until somebody swaps it away; a 3 is a wound you carry until you spend a turn
+fixing it.
 
 On your turn you do exactly one of three things:
 
@@ -42,20 +44,73 @@ The full rules, with the reasoning behind each one, are in **[RULES.md](RULES.md
 
 ```
 RULES.md            the rules, and the design notes arguing for them
-game/index.html     the game, playable in a browser, no build step
+src/                the playable web app: game engine, opponents, table UI
+tests/              the rules tests, and parity tests against the ML engine
+game/index.html     an older single-file version, no build step
 analysis/           the arithmetic the rules were designed against
 ml/                 a batched engine and a self-play trainer
 ```
 
 ### Play it
 
+The game is a [Next.js](https://nextjs.org) app built to be hosted on
+[Vercel](https://vercel.com). You sit at the near seat against one to three
+engine opponents:
+
 ```
-open game/index.html
+npm install
+npm run dev          # play at http://localhost:3000
+npm test             # 32 tests: the rules, and parity with the ML engine
 ```
 
-A single self-contained file — no server, no dependencies. It seats two to four
-players around a table, deals, tracks the running health totals for you, and
-keeps charges face down where they belong.
+You choose who you sit down against — the same ladder the ML project measured
+itself on:
+
+| opponent | who it is |
+| --- | --- |
+| **Cadet** | uniform over legal moves — the floor |
+| **Gunner** | fires at the first opportunity, the impatience the rules punish |
+| **Officer** | the reference heuristic from the analysis scripts |
+| **Ace** | the self-play network — 4.1 million games of training |
+
+There is an **Ask the Ace** button on your turn: it shows what the trained
+network would do from your seat, with its five action scores, so you can
+practice against its judgement and not just its results. The scoreboard in the
+top bar keeps your running record against each opponent between sessions.
+
+Every opponent sees only what you see. Charges are face down to everybody —
+the engines are handed the public state of the table, never the values of the
+face-down cards, and the test suite asserts exactly that.
+
+#### Deploy it on Vercel
+
+The app is a fully static export — no server code, nothing to configure:
+
+```
+npm i -g vercel && vercel       # or: push the repo and import it on vercel.com
+```
+
+Importing the repository at [vercel.com/new](https://vercel.com/new) works as
+is: Vercel detects Next.js, runs `next build`, and serves the exported site
+from its CDN. The trained network ships as ~20 kB of weights inside the
+JavaScript bundle and runs in the browser, so games cost no compute after the
+page loads.
+
+#### Is the browser opponent the real one?
+
+Yes, provably. The TypeScript engine is tested against the Python one three
+ways (`npm test`):
+
+- the 16 rules tests from `ml/test_engine.py`, ported clause for clause,
+- 360 golden positions photographed out of real games by `ml/export_web.py`,
+  where target choice, legal moves, all 26 features, the network's five output
+  scores and every policy's chosen action must match the Python engine exactly,
+- whole-game statistics — median game length and reshuffle rate at every
+  player count against the published tables, and the Ace's win rate over the
+  Officer, which must still be roughly the trained 81%.
+
+Retrain the checkpoint, run `python3 -m ml.export_web`, and the browser
+opponent moves with it.
 
 ### The arithmetic
 
@@ -116,3 +171,16 @@ RULES.md are readings that have not been ruled on, and the open questions at the
 bottom list what is still undecided — the one that matters most is whether a
 shield swap is a blind forced draw or a look-first choice, because it changes
 the model rather than just the play.
+
+## Roadmap
+
+- **Rule design as a collaboration.** Teach the rules to a model that can also
+  simulate them, and ask it to propose new rules that make sense — variants
+  that keep the game going, deepen the choices, or close the failure modes the
+  design notes worry about (the passive table above all). The tooling for this
+  already exists in the repo: a candidate rule goes into `ml/engine.py`, the
+  self-play trainer measures what it does to the game's rhythm, and the ones
+  that survive the arithmetic graduate to RULES.md and the app.
+- **Human results as evidence.** The web app records your results against each
+  engine; enough games against the Ace is playtest data the design notes can
+  actually use.
