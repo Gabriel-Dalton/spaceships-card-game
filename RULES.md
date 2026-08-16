@@ -24,6 +24,19 @@ Each player is dealt:
 - **3 health cards**, laid out vertically, face up.
 - **1 shield card**, laid horizontally, face up.
 
+You will also need **pen and paper**.
+
+### Health is a running total
+
+The three health cards set your **starting health total** — add them up, and
+write the number down. **[inferred]** From then on health lives on the paper,
+not on the table: damage is subtracted from your running total, and you are out
+when it reaches **0**.
+
+The cards stay face up as a record of where you started, but they are never
+individually destroyed. Three average cards means a starting total of around
+**21**.
+
 ### Reading your shield
 
 Values run 1–13, so the average card is **7**. A shield **below 7 is a
@@ -56,38 +69,37 @@ Choose an opponent. The attack resolves against **their shield value**.
 
 #### Resolving the attack
 
+**The shield blocks damage equal to its printed value, and the rest comes off the
+defender's health total.**
+
+```
+damage to health = attack value - shield value
+```
+
+A 10 against a 6 shield deals 4: the shield soaks 6, the remaining 4 is
+subtracted from the defender's running total on the paper. The shield's value is
+*absorbed*, not removed from play — it will block that same amount again on the
+very next attack.
+
 | Comparison | Result |
 | --- | --- |
-| `attack < shield` | **Blocked.** Nothing happens. Your charges are *not* spent — they stay banked for next turn. |
-| `attack >= shield` | **Breakthrough.** Overflow damage hits their health, their charges are eliminated, and your charges are spent. |
+| `attack < shield` | **Blocked.** No damage. Your charges are *not* spent — they stay banked for next turn. |
+| `attack >= shield` | **Breakthrough.** The excess comes off their health, their charges are eliminated, and your charges are spent. |
 
-Note that **equal breaks through** — an attack of exactly 7 gets past a shield of
-7.
+Note that **equal counts as breaking through**. An attack of exactly 7 against a
+shield of 7 deals no damage at all, but it still wipes the defender's charges and
+still costs you yours — a pure disarm, and occasionally worth doing on purpose
+against someone sitting on a big stockpile.
 
 #### On a breakthrough
 
-1. **Overflow damage** is dealt to the defender's health:
-
-   ```
-   damage = attack value - shield value
-   ```
-
-   The shield's value is subtracted, not removed from play. A 10 against a 6
-   shield deals 4.
-
-2. That damage **destroys one of the defender's health cards whose value it meets
-   or exceeds**. Damage of 4 can take out a 4, a 3, an Ace — but bounces off a
-   9. If the defender has no health card the damage can reach, the attack breaks
-   through for nothing. **[inferred]** — see open question 1 on who chooses the
-   card and whether leftover damage carries over.
-
-3. **All of the defender's charged cards are eliminated.** Whatever offence they
+1. **Damage** (`attack - shield`) is subtracted from the defender's health total
+   on the paper.
+2. **All of the defender's charged cards are eliminated.** Whatever offence they
    had banked up is gone.
-
-4. **The attacker's charges are spent**, returning them to zero.
-
-5. **The defender's shield is untouched.** It stays exactly as it was, at the
-   same value, ready to block the next attack.
+3. **The attacker's charges are spent**, returning them to zero.
+4. **The defender's shield is untouched.** It stays exactly as it was, at the
+   same value, ready to block the same amount again next time.
 
 ### 2. Swap a shield
 
@@ -126,6 +138,19 @@ battlefield:
 - Conversely, swapping is the only repair available, so a player unlucky enough
   to draw a low shield twice is in serious trouble.
 
+### The maths makes charging mandatory
+
+Run the average numbers and the game's engine falls out. An average draw is 7 and
+an average shield is 7, so **a plain uncharged attack deals about zero damage**.
+Attacking off the top of the deck is close to worthless against a healthy
+opponent.
+
+Charging is what makes damage exist at all. Bank two charges (≈14) and attack
+(≈7) for 21, against a 7 shield, and you deal ~14 — most of a player's ~21
+starting health, off a three-turn cycle. Two of those cycles kills someone, so a
+duel runs somewhere around a dozen turns, and every point of shield the defender
+carries is a point taken off *every* incoming hit for the rest of the game.
+
 Against that, the three actions form a tempo triangle:
 
 - **Charge** trades a turn for power, and is the only route through a big shield.
@@ -143,14 +168,13 @@ over-banking comes from other players, not from missing.
 
 ## Open questions
 
-1. **Health damage detail.** Confirmed: overflow damage destroys a health card it
-   meets or exceeds. Still open: does the *defender* choose which qualifying card
-   dies, or the attacker? And if damage exceeds the card destroyed, does the
-   remainder carry to a second card or is it wasted?
+1. **Starting health total.** Assumed to be the sum of your three dealt health
+   cards (≈21). Confirm — the alternative is a flat starting number for everyone,
+   with the cards being purely decorative.
 2. **Charge cap.** Is there a limit on how many cards you can have charged at
-   once?
-3. **Win condition.** Player is out when all 3 health cards are gone, last ship
-   flying wins? **[inferred as yes]**
+   once? Uncapped, a patient player can bank toward a hit nothing can survive.
+3. **Win condition.** Player is out at 0 health, last ship flying wins?
+   **[inferred as yes]**
 4. **Swap commitment.** When you swap a shield, is the replacement drawn blind
    from the deck and forced (you're stuck with whatever comes up), or can you
    look first? Blind is assumed above.
