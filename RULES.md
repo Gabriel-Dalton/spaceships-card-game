@@ -11,7 +11,9 @@ needs deciding.
 
 ## Components
 
-- One standard deck. Card value = pip value, **Ace = 1** through King = 13.
+- One standard 52-card deck, no jokers. Card value = pip value, **Ace = 1**
+  through King = 13, so there are exactly **four of every value**. Suits are
+  ignored entirely — they carry no meaning in any rule.
 - Card *orientation* on the table is meaningful and is how you tell the two
   zones apart at a glance:
   - **Vertical (portrait)** = health
@@ -213,6 +215,36 @@ worth 7 on average and the expected value of a stockpile is still 7 per card.
 What it changes is that you can never wait for a *good* bank, only a *big* one.
 Charge counts, not card values, are the entire language of the game.
 
+### The deck is a turn budget, and it decides the player count
+
+Every action in the game draws exactly one card — attack, swap and charge alike.
+Setup takes four cards a player. So the number of turns a game can contain is
+fixed before anyone acts:
+
+```
+turns available = 52 - 4 x players
+```
+
+| players | setup | turns in the deck | turns each | median game | ran the deck dry |
+| --- | --- | --- | --- | --- | --- |
+| 2 | 8 | 44 | 22 | 13 | **0.0%** |
+| 3 | 12 | 40 | 13 | 22 | 1.5% |
+| 4 | 16 | 36 | 9 | 31 | 28.4% |
+| 5 | 20 | 32 | 6 | 33 | 83.1% |
+| 6 | 24 | 28 | 4 | 29 | 99.7% |
+
+*(20,000 simulated games each, sensible heuristic play)*
+
+**A duel never runs out.** Not once in 20,000 games — a two-player game uses a
+median of 13 turns against a budget of 44, and even the long tail stays well
+inside it. Deck exhaustion is a rule a duel will essentially never invoke.
+
+Above three players it stops being a corner case and becomes the way most games
+end. At five and six, the deck is the primary win condition, which is not a game
+so much as a countdown. **The physical deck therefore caps this at two or three
+players**, four with a reshuffle rule and the understanding that the shuffle will
+be reached routinely.
+
 ### Why the binding declaration costs almost nothing
 
 Making the call binding sounds harsh, and the arithmetic says it is nearly free.
@@ -385,10 +417,14 @@ in is what the bank is for.
 3. **Swap commitment.** When you swap a shield, is the replacement drawn blind
    from the deck and forced (you're stuck with whatever comes up), or can you
    look first? Blind is assumed above.
-4. **Deck exhaustion.** Reshuffle the discards, or does the game end?
+4. **Deck exhaustion.** Reshuffle the discards, or does the game end? Recommend
+   reshuffle. A duel reached it in 0 of 20,000 simulated games, so at two players
+   the rule costs nothing and never fires; it only starts mattering at four.
 5. **Player count.** Written as multiplayer, which the swap-someone-else's-shield
-   rule implies. Confirm the intended count — the first-turn maths above assumes
-   a duel and gets more lopsided as the table grows.
+   rule implies. The deck answers this on its own — see *The deck is a turn
+   budget*. Two or three players fits comfortably, four needs the reshuffle, and
+   five or six turns the deck into a countdown timer. Recommend **2–3, duel
+   preferred**, which is also where the first-turn compensation maths holds.
 
 ### Settled since the last pass
 
@@ -400,15 +436,24 @@ in is what the bank is for.
 
 ### Still needed before a solver can be written
 
-The three questions below are the ones that change the model, not just the play.
-Everything above is now precise enough to compute on; these are not.
+Only **swap commitment (3)** now changes the model rather than the play. Blind-and-
+forced is assumed throughout; look-first would make swapping a far stronger action
+and move the shield equilibrium, so the solver needs that one settled first.
 
-- **Player count (5).** A duel is a clean two-player zero-sum game. Three or more
-  brings in target selection and the kingmaker problem, and the disarm-hazard
-  maths above suggests multiplayer may not self-regulate.
-- **Deck exhaustion (4).** Reshuffle-the-discards makes the deck effectively
-  infinite and every draw an independent uniform 1–13, which is the model all the
-  numbers here assume. A finite deck that ends the game makes card counting real
-  and adds the remaining-deck composition to the state.
-- **Swap commitment (3).** Blind-and-forced is assumed. Look-first would make
-  swapping a much stronger action and change the shield equilibrium.
+Everything else is precise enough to compute on. Two properties of the finished
+rules make an exact engine realistic, and both come from the face-down charge
+rule:
+
+- **There is no private information.** Nobody, the owner included, knows what a
+  charge is worth, so every player sees an identical game state: healths, shields,
+  charge counts, and the discards. That makes this a perfect-information
+  stochastic game, solvable by backward induction into a single best move per
+  position — not an imperfect-information game needing an equilibrium solver and
+  mixed strategies. Letting owners peek at their own charges would have cost this
+  outright.
+- **Unknown cards stay exchangeable.** Face-down charges are never observed, so
+  they remain statistically identical to cards still in the deck. The unseen pool
+  is just *deck + all face-down charges*, every draw is uniform from it, and its
+  composition is common knowledge. A duel ends with a median of 31 of 52 cards
+  still unidentified, so counting stays weak and the uniform 1–13 model is a sound
+  evaluation function throughout — typical error under 2% early, around 5% late.
