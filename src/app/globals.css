@@ -54,7 +54,9 @@ body{
   font-size:.57rem; text-transform:uppercase; letter-spacing:.18em;
   color: var(--ink-faint); font-weight:400;
 }
-.num{ font-variant-numeric: tabular-nums; }
+/* Numbers are set in the same serif as everything else, with the font's own
+   proportional figures. Tabular (monospaced) figures were making every total
+   on the table read like console output. */
 
 /* ------------------------------------------------------------------ shell
    The room fills the window and the table takes whatever height is left over
@@ -289,17 +291,10 @@ button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
   font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:#8C846E;
   display:flex; justify-content:space-between; gap:12px; align-items:baseline;
 }
-.coach .verdict{ font-size:.95rem; color:#EFEADB; margin:0; }
+.coach .verdict{ font-size:1.02rem; color:#EFEADB; margin:0; line-height:1.45; }
 .coach .verdict b{ color:var(--gold-lit); font-weight:400; }
-.coach .why{ font-size:.8rem; color:#A79E82; margin:0; font-style:italic; }
-/* the five action scores, as a bar apiece: the shape of the net's opinion */
-.bars{ display:grid; grid-template-columns:auto 1fr auto; gap:3px 10px; align-items:center; }
-.bars .k{ font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:#8C846E; }
-.bars .k.off{ opacity:.4; text-decoration:line-through; }
-.bars .track{ height:6px; background:#2C2718; border-radius:1px; position:relative; overflow:hidden; }
-.bars .fill{ position:absolute; top:0; bottom:0; background:var(--gold-deep); }
-.bars .fill.best{ background:var(--gold-lit); }
-.bars .v{ font-size:.66rem; color:#6E674F; font-variant-numeric:tabular-nums; }
+.coach .margin{ font-size:.9rem; color:#A79E82; margin:0; }
+.coach .why{ font-size:.8rem; color:#7B735C; margin:0; font-style:italic; }
 
 .over{
   border:1px solid var(--gold-deep); background:#241F12; border-radius:3px;
