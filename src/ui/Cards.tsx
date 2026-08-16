@@ -27,26 +27,9 @@ export function CardBack({ rot = 0 }: { rot?: number }) {
   );
 }
 
-/** `land` turns the card on its side for a shield. The rotation has to go in
- *  the same inline transform as the tilt -- a CSS rule would lose to it. */
-export function CardFace({
-  value,
-  rot = 0,
-  land = false,
-}: {
-  value: number;
-  rot?: number;
-  land?: boolean;
-}) {
-  const card = (
-    <div
-      className="card dealt"
-      style={{
-        transform: land
-          ? `translate(-50%,-50%) rotate(${90 + rot}deg)`
-          : `rotate(${rot}deg)`,
-      }}
-    >
+export function CardFace({ value, rot = 0 }: { value: number; rot?: number }) {
+  return (
+    <div className="card dealt" style={{ transform: `rotate(${rot}deg)` }}>
       <div className="face" role="img" aria-label={rankName(value)}>
         <div className="pip num">{rankName(value)}</div>
         <div className="mid">
@@ -58,7 +41,6 @@ export function CardFace({
       </div>
     </div>
   );
-  return land ? <div className="land">{card}</div> : card;
 }
 
 export function Sprite() {

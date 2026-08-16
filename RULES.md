@@ -14,17 +14,16 @@ needs deciding.
 - One standard 52-card deck, no jokers. Card value = pip value, **Ace = 1**
   through King = 13, so there are exactly **four of every value**. Suits are
   ignored entirely — they carry no meaning in any rule.
-- Card *orientation* on the table is meaningful and is how you tell the two
-  zones apart at a glance:
-  - **Vertical (portrait)** = health
-  - **Horizontal (landscape)** = shield
+- Card *placement* in front of you is meaningful and is how you tell the two
+  zones apart at a glance: **the shield sits above the health cards.** Nothing
+  is rotated or marked — where a card sits is what it is.
 
 ## Setup
 
 Each player is dealt:
 
-- **3 health cards**, laid out vertically, face up.
-- **1 shield card**, laid horizontally, face up.
+- **3 health cards**, laid out in a row, face up.
+- **1 shield card**, placed above them, face up.
 
 You will also need **pen and paper**.
 
