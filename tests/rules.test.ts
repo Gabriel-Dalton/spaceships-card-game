@@ -50,6 +50,19 @@ test("a blocked plain attack costs nothing", () => {
   assert.equal(game.ships[0].bank.length, 2, "a plain attack spends no charges");
 });
 
+test("a charge attack is the drawn card plus the whole bank", () => {
+  // Not the bank alone: you still draw, and every charge goes in on top.
+  const g = table({ shield: [7, 4], deck: [6], banks: [[9, 5, 2], []] });
+  const { game, event } = step(g, CHARGE_ATTACK);
+  assert.equal(event.kind === "attack" && event.total, 6 + 9 + 5 + 2, "22, not 16");
+  assert.equal(game.ships[1].health, 20 - (22 - 4));
+
+  // A plain attack from the same position is the one card, bank untouched.
+  const plain = step(table({ shield: [7, 4], deck: [6], banks: [[9, 5, 2], []] }), ATTACK);
+  assert.equal(plain.event.kind === "attack" && plain.event.total, 6);
+  assert.equal(plain.game.ships[0].bank.length, 3);
+});
+
 test("a charge attack is binding even when blocked", () => {
   const g = table({ shield: [7, 13], deck: [1], banks: [[2], []] });
   const { game } = step(g, CHARGE_ATTACK);

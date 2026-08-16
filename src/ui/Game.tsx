@@ -140,7 +140,7 @@ export default function Game() {
         },
         {
           id: -1,
-          text: `${g.ships[g.current].name} opens — lowest starting health takes the first turn.`,
+          text: `${g.ships[g.current].human ? "You open" : `${g.ships[g.current].name} opens`} — lowest starting health takes the first turn.`,
           cls: "sys",
         },
       ]);
@@ -405,7 +405,7 @@ export default function Game() {
               >
                 <div className="nameline">
                   <span className="nm">{ship.name}</span>
-                  <span className={"hp num" + (ship.health < ship.startHealth ? " hurt" : "")}>
+                  <span className={"hp" + (ship.health < ship.startHealth ? " hurt" : "")}>
                     {Math.max(0, ship.health)}
                   </span>
                   {!ship.human && !watching && <span className="engine">{engineName}</span>}
@@ -443,7 +443,7 @@ export default function Game() {
                           <CardBack key={k} rot={tilt(i * 29 + k)} />
                         ))}
                       </div>
-                      <span className="label num">
+                      <span className="label">
                         {ship.bank.length
                           ? `${ship.bank.length} charge${ship.bank.length > 1 ? "s" : ""}`
                           : "no charges"}
@@ -475,7 +475,7 @@ export default function Game() {
                 ) : (
                   <div className="slot-empty" />
                 )}
-                <span className="label num">Deck {game.deck.length}</span>
+                <span className="label">Deck {game.deck.length}</span>
               </div>
               <div className="pile">
                 {game.discard.length ? (
@@ -485,7 +485,7 @@ export default function Game() {
                 ) : (
                   <div className="slot-empty" />
                 )}
-                <span className="label num">Discard {game.discard.length}</span>
+                <span className="label">Discard {game.discard.length}</span>
               </div>
             </div>
             <div className="played">
@@ -514,11 +514,11 @@ export default function Game() {
             <div className="col" key={i}>
               <div className="who">
                 <span>{ship.name}</span>
-                <span className={"live num" + (ship.out ? " dead" : "")}>
+                <span className={"live" + (ship.out ? " dead" : "")}>
                   {Math.max(0, ship.health)}
                 </span>
               </div>
-              <div className="runs num">
+              <div className="runs">
                 {ship.history.map((v, k) => (
                   <span
                     key={k}
@@ -550,12 +550,15 @@ export default function Game() {
         ) : armed ? (
           <>
             <button className="commit" onClick={() => act(CHARGE_ATTACK)}>
-              Say &ldquo;charge attack&rdquo; on {foe.name} &mdash; all {me!.bank.length}
+              Say &ldquo;charge attack&rdquo; on {foe.name} &mdash; a card plus all{" "}
+              {me!.bank.length}
             </button>
             <button onClick={() => setArmed(false)}>Back</button>
             <span className="hint">
-              Binding. Blocked or not the whole bank goes, and you still don&rsquo;t know
-              what it&rsquo;s worth.
+              You still draw one card, and {me!.bank.length} charge
+              {me!.bank.length > 1 ? "s" : ""} {me!.bank.length > 1 ? "go" : "goes"} in on
+              top of it. Binding &mdash; blocked or not the whole bank goes, and you
+              still don&rsquo;t know what it was worth.
             </span>
           </>
         ) : dry ? (
@@ -568,10 +571,10 @@ export default function Game() {
         ) : (
           <>
             <button disabled={!legal?.[ATTACK]} onClick={() => act(ATTACK)}>
-              Attack {foe.name}
+              Attack {foe.name} — one card
             </button>
             <button disabled={!legal?.[CHARGE_ATTACK]} onClick={() => setArmed(true)}>
-              Charge attack{me!.bank.length ? ` (${me!.bank.length})` : ""}
+              Charge attack{me!.bank.length ? ` — card + ${me!.bank.length}` : ""}
             </button>
             <button disabled={!legal?.[CHARGE]} onClick={() => act(CHARGE)}>
               Charge
@@ -608,6 +611,9 @@ export default function Game() {
 
 /* ------------------------------------------------------------------ coach */
 
+/** What the ace would do, said rather than plotted. The network scores five
+ *  actions; a row of numbers is a debug readout, so the margin between its
+ *  first and second choice is put into words instead. */
 function Coach({
   game,
   decision,
@@ -617,24 +623,46 @@ function Coach({
 }) {
   const scores = decision.scores ?? [];
   const legal = legalActions(game, game.current, decision.target);
-  const lo = Math.min(...scores);
-  const hi = Math.max(...scores);
-  const span = hi - lo || 1;
   const foe = game.ships[decision.target];
   const bank = game.ships[game.current].bank.length;
 
-  const verdict =
-    decision.action === -1
-      ? "pass — there is nothing legal here"
-      : decision.action === CHARGE
-        ? "charge, and take the turn off"
-        : decision.action === SWAP_SELF
-          ? "swap its own shield"
-          : decision.action === ATTACK
-            ? `attack ${foe.name} with one card, keeping its ${bank === 0 ? "empty bank" : `${bank} charges`}`
-            : decision.action === CHARGE_ATTACK
-              ? `declare a charge attack on ${foe.name} — all ${bank}`
-              : `swap ${foe.name}’s shield`;
+  const said = (a: Action | -1, short: boolean): string => {
+    switch (a) {
+      case CHARGE:
+        return short ? "charging" : "charge, and take the turn off";
+      case SWAP_SELF:
+        return short ? "swapping its own shield" : "swap its own shield";
+      case ATTACK:
+        return short
+          ? `a plain attack on ${foe.name}`
+          : `attack ${foe.name} with the one drawn card, keeping ${
+              bank === 0 ? "nothing back" : `all ${bank} of its charges`
+            }`;
+      case CHARGE_ATTACK:
+        return short
+          ? `a charge attack on ${foe.name}`
+          : `declare a charge attack on ${foe.name} — the card it draws plus all ${bank}`;
+      case SWAP_TARGET:
+        return short ? `swapping ${foe.name}’s shield` : `swap ${foe.name}’s shield`;
+      default:
+        return "pass — there is nothing legal here";
+    }
+  };
+
+  // The runner-up, and how far behind it is.
+  const ranked = scores
+    .map((v, a) => ({ v, a: a as Action }))
+    .filter((x) => legal[x.a] && x.a !== decision.action)
+    .sort((x, y) => y.v - x.v);
+  const gap = ranked.length ? (scores[decision.action as number] ?? 0) - ranked[0].v : 0;
+  const margin = !ranked.length ? (
+    <>It is the only legal move here.</>
+  ) : (
+    <>
+      {gap >= 1.5 ? "Comfortably ahead of " : gap >= 0.5 ? "Ahead of " : "Only just, over "}
+      {said(ranked[0].a, true)}.
+    </>
+  );
 
   return (
     <section className="coach">
@@ -643,53 +671,14 @@ function Coach({
         <span>self-play generation {TRAINED_GENERATION}</span>
       </div>
       <p className="verdict">
-        It would <b>{verdict}</b>.
+        It would <b>{said(decision.action, false)}</b>.
       </p>
-      <div className="bars">
-        {ACTION_NAMES.map((nm, a) => (
-          <Bar
-            key={nm}
-            name={nm}
-            value={scores[a] ?? 0}
-            frac={((scores[a] ?? lo) - lo) / span}
-            legal={legal[a]}
-            best={a === decision.action}
-          />
-        ))}
-      </div>
+      <p className="margin">{margin}</p>
       <p className="why">
-        Scores, not probabilities — it plays the highest legal one. It is reading the
-        same table you are: it cannot see the value of any face-down card, its own
-        included.
+        It is reading the same table you are — it cannot see the value of any face-down
+        card, its own included.
       </p>
     </section>
-  );
-}
-
-function Bar({
-  name,
-  value,
-  frac,
-  legal,
-  best,
-}: {
-  name: string;
-  value: number;
-  frac: number;
-  legal: boolean;
-  best: boolean;
-}) {
-  return (
-    <>
-      <span className={"k" + (legal ? "" : " off")}>{name}</span>
-      <span className="track">
-        <span
-          className={"fill" + (best ? " best" : "")}
-          style={{ width: `${Math.max(2, frac * 100)}%`, opacity: legal ? 1 : 0.3 }}
-        />
-      </span>
-      <span className="v">{value.toFixed(2)}</span>
-    </>
   );
 }
 
@@ -739,9 +728,11 @@ function HowTo() {
           <em>and</em> by their owner. Everyone knows the count; nobody knows the total.
         </li>
         <li>
-          <b>Say &ldquo;charge attack&rdquo; before you draw, or not at all.</b> It
-          commits the whole bank — all or nothing — and it is binding whether it lands or
-          is blocked. A plain attack is one card and never touches your charges.
+          <b>Say &ldquo;charge attack&rdquo; before you draw, or not at all.</b> You draw
+          a card either way; declaring adds <em>every</em> charge you hold on top of it,
+          so the attack is the drawn card <em>plus</em> the whole bank. All or nothing —
+          you cannot hold one back — and binding whether it lands or is blocked. A plain
+          attack is the one card alone and never touches your charges.
         </li>
         <li>
           <b>Breaking through disarms.</b> Excess damage comes off health and the

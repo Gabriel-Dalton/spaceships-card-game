@@ -31,13 +31,13 @@ export function CardFace({ value, rot = 0 }: { value: number; rot?: number }) {
   return (
     <div className="card dealt" style={{ transform: `rotate(${rot}deg)` }}>
       <div className="face" role="img" aria-label={rankName(value)}>
-        <div className="pip num">{rankName(value)}</div>
+        <div className="pip">{rankName(value)}</div>
         <div className="mid">
           <svg viewBox="0 0 64 64" aria-hidden="true">
             <use href="#rose" x="0" y="0" width="64" height="64" />
           </svg>
         </div>
-        <div className="pip bot num">{rankName(value)}</div>
+        <div className="pip bot">{rankName(value)}</div>
       </div>
     </div>
   );
