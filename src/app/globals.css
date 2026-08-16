@@ -296,6 +296,31 @@ button.commit:hover:not(:disabled){ border-color:#B94F33; color:#FBE0D6; }
 .coach .margin{ font-size:.9rem; color:#A79E82; margin:0; }
 .coach .why{ font-size:.8rem; color:#7B735C; margin:0; font-style:italic; }
 
+/* ------------------------------------------------------------- the verdict
+   A card laid on the table when your game ends -- which, at a big table, is
+   the moment you are destroyed and not a turn later. */
+.verdict-box{
+  border:1px solid var(--gold-deep); border-radius:4px;
+  background:linear-gradient(168deg, #26210F, #1A1710);
+  color:#EFEADB; font-family:var(--serif);
+  padding:26px 30px; max-width:min(30rem, 88vw);
+  box-shadow:0 26px 70px rgba(0,0,0,.7);
+  animation:verdict-in .28s ease-out;
+}
+.verdict-box::backdrop{ background:rgba(10,9,6,.72); }
+@keyframes verdict-in{
+  from{ opacity:0; transform:translateY(10px) scale(.98); }
+  to{ opacity:1; transform:none; }
+}
+.verdict-box .headline{
+  margin:0 0 10px; font-size:1.5rem; line-height:1.25; letter-spacing:.02em;
+}
+.verdict-box .headline.bad{ color:#E08163; }
+.verdict-box .headline.good{ color:var(--gold-lit); }
+.verdict-box .blow{ margin:0 0 8px; font-size:.95rem; color:#C9C0A4; }
+.verdict-box .tally{ margin:0 0 18px; font-size:.85rem; color:#8C846E; font-style:italic; }
+.verdict-box .set{ display:flex; gap:8px; flex-wrap:wrap; }
+
 .over{
   border:1px solid var(--gold-deep); background:#241F12; border-radius:3px;
   padding:14px 16px; display:flex; align-items:center; gap:16px;
