@@ -8,14 +8,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from .engine import (ATTACK, CHARGE, CHARGE_ATTACK, RANKS, SWAP_SELF,
+from .engine import (ATTACK, CHARGE, CHARGE_ATTACK, RANKS, RuleSet, SWAP_SELF,
                      SWAP_TARGET, Spaceships, play)
 from .policies import HeuristicPolicy, RandomPolicy
 
 
-def table(n_games=1, n_players=2, seed=0):
+def table(n_games=1, n_players=2, seed=0, rules=None):
     """An empty two-seat table with nothing dealt, ready to be posed."""
-    env = Spaceships(n_games, n_players, rng=np.random.default_rng(seed))
+    kw = {"rules": rules} if rules is not None else {}
+    env = Spaceships(n_games, n_players, rng=np.random.default_rng(seed), **kw)
     env.charges[:] = 0
     env.discard[:] = 0
     env.deck[:] = 4
@@ -217,6 +218,104 @@ def test_features_are_finite():
         legal = env.legal_actions(rows)
         acts = np.where(legal.any(1), legal.argmax(1), -1)
         env.step(rows, acts)
+
+
+# ------------------------------------------------- the proposals in PROPOSALS.md
+# All of these are off by default; the tests above are the proof of that, since
+# they pass against an engine built with no rules argument at all.
+
+def test_standard_rules_are_the_default():
+    env = Spaceships(1, 2)
+    assert env.rules == RuleSet(), "a plain engine plays RULES.md as written"
+    assert env.rules.salvage == 0 and not env.rules.ricochet
+    assert env.rules.charge_draw == 1 and not env.rules.deal_four
+    assert not env.rules.strict_breakthrough
+
+
+def test_salvage_takes_a_charge_out_of_the_wreck():
+    env = table(rules=RuleSet(salvage=1))
+    env.shield[0, 1] = 3
+    env.deck[0] = 0
+    env.deck[0, 8] = 1                      # a 9 through a 3
+    bank(env, 0, 1, [4, 4, 4])              # their bank, about to be wrecked
+    env.step([0], [ATTACK])
+    assert env.charges[0, 1].sum() == 0, "the defender still loses the lot"
+    assert env.charges[0, 0].sum() == 1, "and one card goes to the attacker"
+    assert env.charges[0, 0, 3] == 1, "the salvaged card is one of their 4s"
+    assert env.discard[0, 3] == 2, "the other two are discarded"
+
+
+def test_salvage_survives_the_attacker_spending_their_own_bank():
+    env = table(rules=RuleSet(salvage=1))
+    env.shield[0, 1] = 2
+    env.deck[0] = 0
+    env.deck[0, 5] = 1
+    bank(env, 0, 0, [10])                   # ours, declared and spent
+    bank(env, 0, 1, [8, 8])                 # theirs, wrecked
+    env.step([0], [CHARGE_ATTACK])
+    assert env.charges[0, 0].sum() == 1, "the declared bank went, the salvage stayed"
+    assert env.charges[0, 0, 7] == 1
+
+
+def test_ricochet_arms_the_defender_only_when_blocked():
+    env = table(rules=RuleSet(ricochet=True))
+    env.shield[0, 1] = 13
+    env.deck[0] = 0
+    env.deck[0, 1] = 1                      # a 2 into a King: blocked
+    env.step([0], [ATTACK])
+    assert env.charges[0, 1, 1] == 1, "the defender banks the bounced card"
+    assert env.discard[0].sum() == 0
+
+    env = table(rules=RuleSet(ricochet=True))
+    env.shield[0, 1] = 2
+    env.deck[0] = 0
+    env.deck[0, 9] = 1                      # a 10 through a 2: not blocked
+    env.step([0], [ATTACK])
+    assert env.charges[0, 1].sum() == 0
+    assert env.discard[0, 9] == 1, "a landed shot is spent as usual"
+
+
+def test_charge_draw_banks_more_than_one():
+    env = table(rules=RuleSet(charge_draw=2))
+    before = env.deck[0].sum()
+    env.step([0], [CHARGE])
+    assert env.charges[0, 0].sum() == 2
+    assert env.deck[0].sum() == before - 2
+
+    # With one card left anywhere, a two-card charge banks the one card.
+    env = table(rules=RuleSet(charge_draw=2))
+    env.deck[0] = 0
+    env.discard[0] = 0
+    env.deck[0, 4] = 1
+    env.step([0], [CHARGE])
+    assert env.charges[0, 0].sum() == 1
+
+
+def test_strict_breakthrough_holds_at_dead_level():
+    env = table(rules=RuleSet(strict_breakthrough=True))
+    env.shield[0, 1] = 7
+    env.deck[0] = 0
+    env.deck[0, 6] = 1                      # exactly 7 into a 7
+    bank(env, 0, 1, [10, 10])
+    env.step([0], [ATTACK])
+    assert env.charges[0, 1].sum() == 2, "equal no longer disarms"
+    assert env.health[0, 1] == 20
+
+
+def test_deal_four_spends_the_same_four_cards():
+    for pick in ("high", "low", "mid"):
+        env = Spaceships(400, 3, rng=np.random.default_rng(2),
+                         rules=RuleSet(deal_four=True, shield_pick=(pick,)))
+        # Four cards a player, exactly as the standard deal uses.
+        assert env.deck.sum(1).min() == 52 - 4 * 3
+        assert (env.shield >= 1).all() and (env.shield <= 13).all()
+        assert (env.health >= 3).all()
+    high = Spaceships(4000, 2, rng=np.random.default_rng(3),
+                      rules=RuleSet(deal_four=True, shield_pick=("high",)))
+    low = Spaceships(4000, 2, rng=np.random.default_rng(3),
+                     rules=RuleSet(deal_four=True, shield_pick=("low",)))
+    assert high.shield.mean() > low.shield.mean() + 4
+    assert low.health.mean() > high.health.mean() + 4
 
 
 def main():
